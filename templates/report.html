@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhiteRabbit Scan Report — {{ report.target }}</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1e1e2e; --fg-muted: #6c7086;
+  --card-bg: #f8f9fb; --card-border: #e2e5ea; --card-hover: #f0f2f6;
+  --table-stripe: #f8f9fb; --table-hover: #eef0f5;
+  --grade-a: #40a02b; --grade-b: #1e90cc; --grade-c: #df8e1d;
+  --grade-d: #e64553; --grade-f: #d20f39;
+  --sev-critical: #d20f39; --sev-high: #e64553; --sev-medium: #df8e1d;
+  --sev-low: #1e90cc; --sev-info: #8c8fa1;
+  --remedy-bg: rgba(64, 160, 43, 0.08); --remedy-border: rgba(64, 160, 43, 0.25);
+  --link: #1e66f5; --code-bg: #e6e9ef;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1e1e2e; --fg: #cdd6f4; --fg-muted: #a6adc8;
+    --card-bg: #24243a; --card-border: #313244; --card-hover: #2a2a42;
+    --table-stripe: #24243a; --table-hover: #2a2a42;
+    --grade-a: #a6e3a1; --grade-b: #89dceb; --grade-c: #f9e2af;
+    --grade-d: #f38ba8; --grade-f: #f38ba8;
+    --sev-critical: #f38ba8; --sev-high: #eba0ac; --sev-medium: #f9e2af;
+    --sev-low: #89dceb; --sev-info: #7f849c;
+    --remedy-bg: rgba(166, 227, 161, 0.08); --remedy-border: rgba(166, 227, 161, 0.2);
+    --link: #89b4fa; --code-bg: #313244;
+  }
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  background: var(--bg); color: var(--fg); line-height: 1.65;
+  padding: 2rem 1.5rem; max-width: 980px; margin: 0 auto;
+}
+h1 { font-size: 1.6rem; font-weight: 700; }
+h2 { font-size: 1.25rem; font-weight: 600; margin: 2.5rem 0 0.75rem; padding-bottom: 0.4rem; border-bottom: 2px solid var(--card-border); }
+h3 { font-size: 1rem; font-weight: 600; }
+a { color: var(--link); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { background: var(--code-bg); padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.88em; }
+
+/* Header */
+.header { text-align: center; padding: 1rem 0 1.5rem; }
+.header h1 { margin-bottom: 0.2rem; }
+.target { font-size: 1.1rem; color: var(--fg-muted); word-break: break-all; }
+.grade-wrap { margin: 1.2rem 0; }
+.grade {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 2.8rem; font-weight: 800; width: 5rem; height: 5rem;
+  border-radius: 16px; color: #fff; letter-spacing: -0.02em;
+}
+.grade-aplus, .grade-a { background: var(--grade-a); }
+.grade-b { background: var(--grade-b); }
+.grade-c { background: var(--grade-c); color: #1e1e2e; }
+.grade-d { background: var(--grade-d); }
+.grade-f { background: var(--grade-f); }
+.meta { color: var(--fg-muted); font-size: 0.85rem; margin-top: 0.5rem; }
+.meta span { margin: 0 0.4rem; }
+
+/* Severity summary cards */
+.summary { display: flex; gap: 0.75rem; flex-wrap: wrap; justify-content: center; margin: 1.5rem 0 0.5rem; }
+.sev-card {
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px;
+  padding: 0.8rem 1.4rem; text-align: center; min-width: 90px; transition: transform 0.15s;
+}
+.sev-card:hover { transform: translateY(-2px); }
+.sev-card .count { font-size: 1.7rem; font-weight: 700; }
+.sev-card .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-muted); }
+.sev-critical .count { color: var(--sev-critical); }
+.sev-high .count { color: var(--sev-high); }
+.sev-medium .count { color: var(--sev-medium); }
+.sev-low .count { color: var(--sev-low); }
+.sev-info .count { color: var(--sev-info); }
+
+/* Filter bar */
+.filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 1rem 0; }
+.filter-btn {
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 6px;
+  padding: 0.35rem 0.8rem; font-size: 0.82rem; cursor: pointer; color: var(--fg);
+  transition: all 0.15s;
+}
+.filter-btn:hover { background: var(--card-hover); }
+.filter-btn.active { background: var(--link); color: #fff; border-color: var(--link); }
+
+/* Tables */
+.table-wrap { overflow-x: auto; margin: 0.5rem 0 1rem; }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th { background: var(--card-bg); font-weight: 600; text-align: left; padding: 0.6rem 0.8rem;
+     border-bottom: 2px solid var(--card-border); position: sticky; top: 0; cursor: pointer; user-select: none; }
+th:hover { background: var(--card-hover); }
+th .sort-arrow { font-size: 0.7rem; margin-left: 0.3rem; opacity: 0.4; }
+th.sorted .sort-arrow { opacity: 1; }
+td { padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--card-border); vertical-align: top; }
+tr:nth-child(even) td { background: var(--table-stripe); }
+tr:hover td { background: var(--table-hover); }
+tr.hidden { display: none; }
+
+/* Badges */
+.badge {
+  display: inline-block; padding: 0.18rem 0.55rem; border-radius: 4px; color: #fff;
+  font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.badge-critical { background: var(--sev-critical); }
+.badge-high { background: var(--sev-high); }
+.badge-medium { background: var(--sev-medium); color: #1e1e2e; }
+.badge-low { background: var(--sev-low); }
+.badge-info { background: var(--sev-info); }
+
+/* Finding cards */
+.finding-card {
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 10px;
+  padding: 1.2rem 1.4rem; margin: 0.8rem 0; transition: box-shadow 0.15s;
+}
+.finding-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+.finding-card h3 { margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+.finding-card p { margin: 0.3rem 0; font-size: 0.93rem; }
+.remediation {
+  background: var(--remedy-bg); border-left: 3px solid var(--remedy-border);
+  padding: 0.7rem 1rem; border-radius: 0 6px 6px 0; margin-top: 0.7rem; font-size: 0.9rem;
+}
+.remediation strong { display: block; margin-bottom: 0.2rem; }
+.refs { font-size: 0.85rem; color: var(--fg-muted); margin-top: 0.5rem; }
+.meta-line { font-size: 0.82rem; color: var(--fg-muted); margin-top: 0.3rem; }
+
+/* Scanner details */
+.scanner-details {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem; margin: 1rem 0;
+}
+.scanner-chip {
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 8px;
+  padding: 0.8rem 1rem; font-size: 0.88rem;
+}
+.scanner-chip .name { font-weight: 600; }
+.scanner-chip .detail { color: var(--fg-muted); font-size: 0.82rem; }
+.scanner-chip.errored { border-color: var(--sev-high); }
+
+/* Footer */
+footer { text-align: center; margin-top: 3rem; padding-top: 1.5rem;
+         border-top: 1px solid var(--card-border); color: var(--fg-muted); font-size: 0.82rem; }
+
+/* Print */
+@media print {
+  body { padding: 0; max-width: none; }
+  .grade, .badge, .sev-card { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .filters { display: none; }
+  .finding-card { break-inside: avoid; }
+  tr { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>WhiteRabbit Scan Report</h1>
+  <div class="target">{{ report.target }}</div>
+  <div class="grade-wrap">
+    <div class="grade grade-{{ report.grade | lower | replace('+', 'plus') }}">{{ report.grade }}</div>
+  </div>
+  <div class="meta">
+    <span>{{ report.scan_date.strftime('%Y-%m-%d %H:%M UTC') }}</span>
+    <span>&middot;</span>
+    <span>{{ "%.1f" | format(report.duration_seconds) }}s</span>
+    <span>&middot;</span>
+    <span>{{ report.summary.values() | sum }} finding{{ "s" if report.summary.values() | sum != 1 }}</span>
+    <span>&middot;</span>
+    <span>v{{ report.whiterabbit_version }}</span>
+  </div>
+</div>
+
+<div class="summary">
+  {% for sev in [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW, Severity.INFO] %}
+  <div class="sev-card sev-{{ sev.value }}">
+    <div class="count">{{ report.summary.get(sev, 0) }}</div>
+    <div class="label">{{ sev.value }}</div>
+  </div>
+  {% endfor %}
+</div>
+
+{% set all_findings = [] %}
+{% for result in report.results %}
+  {% for f in result.findings %}
+    {% if all_findings.append(f) %}{% endif %}
+  {% endfor %}
+{% endfor %}
+
+{% if all_findings %}
+<h2>Findings</h2>
+
+{% set categories = all_findings | map(attribute='category') | unique | sort | list %}
+<div class="filters">
+  <button class="filter-btn active" onclick="filterBy('all')">All</button>
+  {% for cat in categories %}
+  <button class="filter-btn" onclick="filterBy('{{ cat }}')">{{ cat }}</button>
+  {% endfor %}
+</div>
+
+{% set sev_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3, 'info': 4} %}
+<div class="table-wrap">
+<table id="findings-table">
+  <thead>
+    <tr>
+      <th onclick="sortTable(0)" style="width:100px">Severity <span class="sort-arrow">&#9650;</span></th>
+      <th onclick="sortTable(1)">Title <span class="sort-arrow">&#9650;</span></th>
+      <th onclick="sortTable(2)" style="width:100px">Category <span class="sort-arrow">&#9650;</span></th>
+      <th onclick="sortTable(3)" style="width:90px">Scanner <span class="sort-arrow">&#9650;</span></th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for f in all_findings | sort(attribute='severity.value') %}
+  <tr data-category="{{ f.category }}" data-sev="{{ sev_order.get(f.severity.value, 4) }}">
+    <td><span class="badge badge-{{ f.severity.value }}">{{ f.severity.value }}</span></td>
+    <td><a href="#finding-{{ loop.index }}">{{ f.title }}</a></td>
+    <td>{{ f.category }}</td>
+    <td>{{ f.scanner }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<h2>Details</h2>
+
+{% for f in all_findings | sort(attribute='severity.value') %}
+<div class="finding-card" id="finding-{{ loop.index }}" data-category="{{ f.category }}">
+  <h3><span class="badge badge-{{ f.severity.value }}">{{ f.severity.value }}</span> {{ f.title }}</h3>
+  <p>{{ f.description }}</p>
+  {% if f.remediation %}
+  <div class="remediation">
+    <strong>Remediation</strong>
+    {{ f.remediation }}
+  </div>
+  {% endif %}
+  {% if f.cwe or f.cve %}
+  <p class="meta-line">
+    {% if f.cwe %}{{ f.cwe }}{% endif %}
+    {% if f.cwe and f.cve %} &middot; {% endif %}
+    {% if f.cve %}{{ f.cve }}{% endif %}
+  </p>
+  {% endif %}
+  {% if f.references %}
+  <p class="refs">
+    {% for ref in f.references %}<a href="{{ ref }}" rel="noopener">{{ ref }}</a>{% if not loop.last %}<br>{% endif %}{% endfor %}
+  </p>
+  {% endif %}
+</div>
+{% endfor %}
+
+{% else %}
+<div style="text-align:center; padding:3rem 0;">
+  <div style="font-size:2.5rem; margin-bottom:0.5rem;">&#10003;</div>
+  <p style="font-size:1.1rem; color:var(--grade-a);">No issues found.</p>
+</div>
+{% endif %}
+
+<h2>Scanner Details</h2>
+<div class="scanner-details">
+  {% for result in report.results %}
+  <div class="scanner-chip {{ 'errored' if result.error }}">
+    <div class="name">{{ result.scanner_name }}</div>
+    <div class="detail">
+      {% if result.error %}
+        Error: {{ result.error }}
+      {% else %}
+        {{ result.findings | length }} finding{{ "s" if result.findings | length != 1 }}
+        &middot; {{ "%.1f" | format((result.finished_at - result.started_at).total_seconds()) }}s
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<footer>
+  Generated by WhiteRabbit v{{ report.whiterabbit_version }}
+</footer>
+
+<script>
+function filterBy(category) {
+  document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+  event.target.classList.add('active');
+  document.querySelectorAll('#findings-table tbody tr').forEach(function(row) {
+    row.classList.toggle('hidden', category !== 'all' && row.dataset.category !== category);
+  });
+  document.querySelectorAll('.finding-card[data-category]').forEach(function(card) {
+    card.style.display = (category === 'all' || card.dataset.category === category) ? '' : 'none';
+  });
+}
+
+var sortDir = [1, 1, 1, 1];
+function sortTable(col) {
+  var table = document.getElementById('findings-table');
+  var tbody = table.tBodies[0];
+  var rows = Array.from(tbody.rows);
+  var dir = sortDir[col] = -sortDir[col];
+  rows.sort(function(a, b) {
+    var av = col === 0 ? parseInt(a.dataset.sev) : a.cells[col].textContent.trim().toLowerCase();
+    var bv = col === 0 ? parseInt(b.dataset.sev) : b.cells[col].textContent.trim().toLowerCase();
+    if (av < bv) return -dir;
+    if (av > bv) return dir;
+    return 0;
+  });
+  rows.forEach(function(r) { tbody.appendChild(r); });
+  table.querySelectorAll('th').forEach(function(th, i) {
+    th.classList.toggle('sorted', i === col);
+    var arrow = th.querySelector('.sort-arrow');
+    if (arrow) arrow.textContent = (i === col && dir === 1) ? '▲' : '▼';
+  });
+}
+</script>
+</body>
+</html>

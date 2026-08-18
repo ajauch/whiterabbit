@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Scan output (user-specific)
+report.json
+report.html
+ScanResults.csv
+whiterabbit.log
+
+# Caches
+.whiterabbit/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude Code local settings
+.claude/settings.local.json

@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "whiterabbit"
+version = "0.1.0"
+description = "A local, open-source web security scanner that aggregates best-in-class tools behind a unified CLI and reporting interface."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "WhiteRabbit Contributors" }]
+keywords = ["security", "scanner", "web", "ssl", "headers"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+]
+dependencies = [
+    "typer>=0.12",
+    "rich>=13.0",
+    "pydantic>=2.0",
+    "httpx>=0.27",
+    "jinja2>=3.1",
+    "sslyze>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[project.scripts]
+whiterabbit = "whiterabbit.cli:app"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/whiterabbit"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "integration: marks tests that hit external services (deselect with '-m \"not integration\"')",
+]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
