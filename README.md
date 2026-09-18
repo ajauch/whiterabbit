@@ -148,9 +148,8 @@ requests: a security scanner that refuses to connect to misconfigured hosts
 cannot assess misconfigured hosts.
 
 The retire.js scanner also uses the same unverified client to download its
-vulnerability database from GitHub (`raw.githubusercontent.com`). Ideally the
-DB fetch would use a verified connection; this is a known tradeoff documented
-in the source.
+vulnerability database from GitHub (`raw.githubusercontent.com`). The DB fetch
+should use a verified connection — see [#7](https://github.com/ajauch/whiterabbit/issues/7).
 
 ## Responsible use
 
