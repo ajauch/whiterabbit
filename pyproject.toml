@@ -11,6 +11,12 @@ license = "MIT"
 requires-python = ">=3.11"
 authors = [{ name = "WhiteRabbit Contributors" }]
 keywords = ["security", "scanner", "web", "ssl", "headers"]
+
+[project.urls]
+Homepage = "https://github.com/ajauch/whiterabbit"
+Repository = "https://github.com/ajauch/whiterabbit"
+Issues = "https://github.com/ajauch/whiterabbit/issues"
+Changelog = "https://github.com/ajauch/whiterabbit/blob/master/CHANGELOG.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
