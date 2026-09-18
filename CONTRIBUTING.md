@@ -1,6 +1,63 @@
 # Contributing to WhiteRabbit
 
-## Adding a New Scanner
+Thanks for your interest in contributing! This guide covers the general
+workflow and the scanner-specific process.
+
+## Getting started
+
+1. Fork the repo and clone your fork
+2. Create a branch from `master`:
+   ```bash
+   git checkout -b my-feature
+   ```
+3. Install in development mode:
+   ```bash
+   pip install -e ".[dev]"
+   ```
+
+## Making changes
+
+- Keep PRs focused — one bug fix or feature per PR.
+- Follow the existing code style. Ruff enforces it automatically.
+- Add tests for new functionality.
+- Update `CHANGELOG.md` under an `[Unreleased]` section.
+
+## Running the checks
+
+All three must pass before a PR will be merged:
+
+```bash
+pytest tests/ -v -m "not integration"
+ruff check src/ tests/
+mypy src/
+```
+
+To auto-format:
+
+```bash
+ruff format src/ tests/
+```
+
+## Submitting a pull request
+
+1. Push your branch to your fork
+2. Open a PR against `master`
+3. Fill out the PR template
+4. Make sure CI passes
+
+## Reporting bugs and requesting features
+
+Use the [issue templates](https://github.com/ajauch/whiterabbit/issues/new/choose)
+on GitHub. For security vulnerabilities, see [SECURITY.md](SECURITY.md).
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant](CODE_OF_CONDUCT.md). By
+participating, you agree to uphold it.
+
+---
+
+## Adding a new scanner
 
 WhiteRabbit is designed to make adding scanners straightforward. Here's how:
 
@@ -73,27 +130,3 @@ Create `tests/scanners/test_your_scanner.py` with:
 - **Set CWE/CVE** when applicable.
 - **Use `config.timeout`** — the runner enforces it, but be a good citizen.
 - **External binaries** go in `required_binaries` so `check-deps` reports them.
-
-## Development Setup
-
-```bash
-pip install -e ".[dev]"
-```
-
-## Running Tests
-
-```bash
-pytest tests/ -v
-```
-
-Skip integration tests (those that hit external services):
-```bash
-pytest tests/ -v -m "not integration"
-```
-
-## Linting
-
-```bash
-ruff check src/ tests/
-ruff format src/ tests/
-```

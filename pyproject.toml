@@ -4,19 +4,13 @@ build-backend = "hatchling.build"
 
 [project]
 name = "whiterabbit"
-version = "0.1.0"
+dynamic = ["version"]
 description = "A local, open-source web security scanner that aggregates best-in-class tools behind a unified CLI and reporting interface."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.11"
 authors = [{ name = "WhiteRabbit Contributors" }]
 keywords = ["security", "scanner", "web", "ssl", "headers"]
-
-[project.urls]
-Homepage = "https://github.com/ajauch/whiterabbit"
-Repository = "https://github.com/ajauch/whiterabbit"
-Issues = "https://github.com/ajauch/whiterabbit/issues"
-Changelog = "https://github.com/ajauch/whiterabbit/blob/master/CHANGELOG.md"
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
@@ -37,6 +31,12 @@ dependencies = [
     "sslyze>=6.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/ajauch/whiterabbit"
+Repository = "https://github.com/ajauch/whiterabbit"
+Issues = "https://github.com/ajauch/whiterabbit/issues"
+Changelog = "https://github.com/ajauch/whiterabbit/blob/master/CHANGELOG.md"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
@@ -47,6 +47,9 @@ dev = [
 
 [project.scripts]
 whiterabbit = "whiterabbit.cli:app"
+
+[tool.hatch.version]
+path = "src/whiterabbit/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/whiterabbit"]
