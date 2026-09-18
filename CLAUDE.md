@@ -45,6 +45,3 @@ WhiteRabbit is a local web security scanner. Src layout: `src/whiterabbit/`.
 
 Tests mock external dependencies (SSLyze, httpx, subprocess) — scanner tests never hit the network. Async tests use `pytest-asyncio` with `asyncio_mode = "auto"`. Shared fixtures in `tests/conftest.py` provide `sample_config`, `sample_finding`, `sample_findings`, `sample_scan_result`, and `sample_report`.
 
-## Known issues
-
-The testssl scanner tests (`tests/scanners/test_testssl_scanner.py`) assert `"testssl.sh" in scanner.required_binaries` but the implementation uses `required_binaries = []` with custom availability checks — these tests fail.
