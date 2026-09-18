@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import sys
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
@@ -18,23 +17,22 @@ from whiterabbit.scanner.testssl_scanner import (
 
 
 def _force_direct_path(stack: ExitStack) -> None:
-    """Force the non-Windows (stdout-based) code path regardless of platform."""
-    if sys.platform == "win32":
-        stack.enter_context(
-            patch(
-                "whiterabbit.scanner.testssl_scanner._find_testssl",
-                return_value="/usr/bin/testssl.sh",
-            )
+    """Force the non-Windows (stdout-based) code path and ensure testssl.sh appears available."""
+    stack.enter_context(
+        patch(
+            "whiterabbit.scanner.testssl_scanner._find_testssl",
+            return_value="/usr/bin/testssl.sh",
         )
-        stack.enter_context(
-            patch(
-                "whiterabbit.scanner.testssl_scanner.shutil.which",
-                return_value="/usr/bin/testssl.sh",
-            )
+    )
+    stack.enter_context(
+        patch(
+            "whiterabbit.scanner.testssl_scanner.shutil.which",
+            return_value="/usr/bin/testssl.sh",
         )
-        stack.enter_context(
-            patch("whiterabbit.scanner.testssl_scanner.sys.platform", "linux")
-        )
+    )
+    stack.enter_context(
+        patch("whiterabbit.scanner.testssl_scanner.sys.platform", "linux")
+    )
 
 
 class TestIsDuplicateOfSSLScanner:
@@ -250,10 +248,14 @@ class TestTestSSLScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 0
 
-        with patch(
-            "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
-            return_value=proc_mock,
-        ):
+        with ExitStack() as stack:
+            _force_direct_path(stack)
+            stack.enter_context(
+                patch(
+                    "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+                    return_value=proc_mock,
+                )
+            )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -297,8 +299,8 @@ class TestTestSSLScanner:
 
     def test_testssl_not_found(self) -> None:
         with patch(
-            "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
-            side_effect=FileNotFoundError("testssl.sh not found"),
+            "whiterabbit.scanner.testssl_scanner._find_testssl",
+            return_value=None,
         ):
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
@@ -314,10 +316,14 @@ class TestTestSSLScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 2
 
-        with patch(
-            "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
-            return_value=proc_mock,
-        ):
+        with ExitStack() as stack:
+            _force_direct_path(stack)
+            stack.enter_context(
+                patch(
+                    "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+                    return_value=proc_mock,
+                )
+            )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -328,10 +334,14 @@ class TestTestSSLScanner:
         async def mock_create(*args, **kwargs):
             raise TimeoutError()
 
-        with patch(
-            "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
-            side_effect=mock_create,
-        ):
+        with ExitStack() as stack:
+            _force_direct_path(stack)
+            stack.enter_context(
+                patch(
+                    "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+                    side_effect=mock_create,
+                )
+            )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig(timeout=10)))
 
@@ -339,10 +349,14 @@ class TestTestSSLScanner:
         assert "timed out" in result.error
 
     def test_general_exception(self) -> None:
-        with patch(
-            "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
-            side_effect=RuntimeError("unexpected"),
-        ):
+        with ExitStack() as stack:
+            _force_direct_path(stack)
+            stack.enter_context(
+                patch(
+                    "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+                    side_effect=RuntimeError("unexpected"),
+                )
+            )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -417,10 +431,14 @@ class TestTestSSLScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 0
 
-        with patch(
-            "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
-            return_value=proc_mock,
-        ):
+        with ExitStack() as stack:
+            _force_direct_path(stack)
+            stack.enter_context(
+                patch(
+                    "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+                    return_value=proc_mock,
+                )
+            )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
