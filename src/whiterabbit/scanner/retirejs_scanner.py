@@ -6,8 +6,9 @@ import hashlib
 import json
 import re
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import urljoin
 
 import httpx
@@ -40,9 +41,9 @@ def _cache_is_fresh() -> bool:
     return age < DB_MAX_AGE_SECONDS
 
 
-async def _fetch_vuln_db(client: httpx.AsyncClient) -> dict:
+async def _fetch_vuln_db(client: httpx.AsyncClient) -> dict[str, Any]:
     if _cache_is_fresh():
-        return json.loads(DB_CACHE_FILE.read_text(encoding="utf-8"))
+        return json.loads(DB_CACHE_FILE.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
 
     response = await client.get(RETIREJS_DB_URL, timeout=30)
     response.raise_for_status()
@@ -50,7 +51,7 @@ async def _fetch_vuln_db(client: httpx.AsyncClient) -> dict:
 
     DB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     DB_CACHE_FILE.write_text(json.dumps(db), encoding="utf-8")
-    return db
+    return db  # type: ignore[no-any-return]
 
 
 def _extract_script_urls(html: str, base_url: str) -> list[str]:
@@ -64,15 +65,16 @@ def _extract_script_urls(html: str, base_url: str) -> list[str]:
     return urls
 
 
-def _extract_version_from_filename(filename: str, extractors: dict) -> str | None:
-    filecontent_patterns = extractors.get("filecontent")
+def _extract_version_from_filename(filename: str, extractors: dict[str, Any]) -> str | None:
     filename_patterns = extractors.get("filename")
     uri_patterns = extractors.get("uri")
 
     for pattern_source in [uri_patterns, filename_patterns]:
         if not pattern_source:
             continue
-        patterns = pattern_source if isinstance(pattern_source, list) else [pattern_source]
+        patterns = (
+            pattern_source if isinstance(pattern_source, list) else [pattern_source]
+        )
         for pattern in patterns:
             try:
                 m = re.search(pattern, filename)
@@ -83,11 +85,15 @@ def _extract_version_from_filename(filename: str, extractors: dict) -> str | Non
     return None
 
 
-def _extract_version_from_content(content: str, extractors: dict) -> str | None:
+def _extract_version_from_content(content: str, extractors: dict[str, Any]) -> str | None:
     filecontent_patterns = extractors.get("filecontent")
     if not filecontent_patterns:
         return None
-    patterns = filecontent_patterns if isinstance(filecontent_patterns, list) else [filecontent_patterns]
+    patterns = (
+        filecontent_patterns
+        if isinstance(filecontent_patterns, list)
+        else [filecontent_patterns]
+    )
     for pattern in patterns:
         try:
             m = re.search(pattern, content)
@@ -98,14 +104,19 @@ def _extract_version_from_content(content: str, extractors: dict) -> str | None:
     return None
 
 
-def _check_hash(content: str, hashes: dict) -> str | None:
+def _check_hash(content: str, hashes: dict[str, str]) -> str | None:
     if not hashes:
         return None
     sha1 = hashlib.sha1(content.encode()).hexdigest()
     return hashes.get(sha1)
 
 
-def _version_in_range(version: str, below: str | None = None, above: str | None = None, at_or_above: str | None = None) -> bool:
+def _version_in_range(
+    version: str,
+    below: str | None = None,
+    above: str | None = None,
+    at_or_above: str | None = None,
+) -> bool:
     def parse_ver(v: str) -> tuple[int, ...]:
         parts: list[int] = []
         for p in v.split("."):
@@ -147,14 +158,18 @@ def _version_in_range(version: str, below: str | None = None, above: str | None 
     return True
 
 
-def _check_vulnerabilities(library: str, version: str, vuln_list: list[dict]) -> list[Finding]:
+def _check_vulnerabilities(
+    library: str, version: str, vuln_list: list[dict[str, Any]]
+) -> list[Finding]:
     findings: list[Finding] = []
     for vuln in vuln_list:
         below = vuln.get("below")
         above = vuln.get("above")
         at_or_above = vuln.get("atOrAbove")
 
-        if not _version_in_range(version, below=below, above=above, at_or_above=at_or_above):
+        if not _version_in_range(
+            version, below=below, above=above, at_or_above=at_or_above
+        ):
             continue
 
         severity_str = vuln.get("severity", "medium").lower()
@@ -165,20 +180,29 @@ def _check_vulnerabilities(library: str, version: str, vuln_list: list[dict]) ->
         cve = cve_list[0] if cve_list else None
 
         info = vuln.get("info", [])
-        summary = identifiers.get("summary", vuln.get("info", f"Known vulnerability in {library} {version}"))
+        summary = identifiers.get(
+            "summary", vuln.get("info", f"Known vulnerability in {library} {version}")
+        )
         if isinstance(summary, list):
-            summary = summary[0] if summary else f"Known vulnerability in {library} {version}"
+            summary = (
+                summary[0] if summary else f"Known vulnerability in {library} {version}"
+            )
 
-        findings.append(Finding(
-            severity=severity,
-            title=f"{library} {version} has known vulnerability" + (f" ({cve})" if cve else ""),
-            description=f"{library} version {version} has a known vulnerability: {summary}",
-            remediation=f"Upgrade {library} to the latest version (requires at least {below})." if below else f"Upgrade {library} to the latest version.",
-            category="js-vuln",
-            scanner="retirejs",
-            cve=cve,
-            references=info if isinstance(info, list) else [info],
-        ))
+        findings.append(
+            Finding(
+                severity=severity,
+                title=f"{library} {version} has known vulnerability"
+                + (f" ({cve})" if cve else ""),
+                description=f"{library} version {version} has a known vulnerability: {summary}",
+                remediation=f"Upgrade {library} to the latest version (requires at least {below})."
+                if below
+                else f"Upgrade {library} to the latest version.",
+                category="js-vuln",
+                scanner="retirejs",
+                cve=cve,
+                references=info if isinstance(info, list) else [info],
+            )
+        )
 
     return findings
 
@@ -187,14 +211,10 @@ class RetireJSScanner(BaseScanner):
     name = "retirejs"
     display_name = "JavaScript Library Scanner"
     description = "Detects known-vulnerable JavaScript libraries (retire.js database)"
-    required_binaries: list[str] = []
 
     async def scan(self, target: str, config: ScanConfig) -> ScanResult:
-        if "://" not in target:
-            url = f"https://{target}"
-        else:
-            url = target
-        started = datetime.now(timezone.utc)
+        url = f"https://{target}" if "://" not in target else target
+        started = datetime.now(UTC)
         findings: list[Finding] = []
 
         try:
@@ -222,7 +242,11 @@ class RetireJSScanner(BaseScanner):
 
                         version = _extract_version_from_filename(script_url, extractors)
                         if version:
-                            findings.extend(_check_vulnerabilities(lib_name, version, vulnerabilities))
+                            findings.extend(
+                                _check_vulnerabilities(
+                                    lib_name, version, vulnerabilities
+                                )
+                            )
                             continue
 
                         hashes = extractors.get("hashes", {})
@@ -232,7 +256,11 @@ class RetireJSScanner(BaseScanner):
                                 js_content = js_resp.text
                                 hash_version = _check_hash(js_content, hashes)
                                 if hash_version:
-                                    findings.extend(_check_vulnerabilities(lib_name, hash_version, vulnerabilities))
+                                    findings.extend(
+                                        _check_vulnerabilities(
+                                            lib_name, hash_version, vulnerabilities
+                                        )
+                                    )
                                     continue
                             except Exception:
                                 continue
@@ -247,7 +275,9 @@ class RetireJSScanner(BaseScanner):
 
                     version = _extract_version_from_content(html, extractors)
                     if version:
-                        findings.extend(_check_vulnerabilities(lib_name, version, vulnerabilities))
+                        findings.extend(
+                            _check_vulnerabilities(lib_name, version, vulnerabilities)
+                        )
 
                 seen: set[str] = set()
                 deduped: list[Finding] = []
@@ -261,21 +291,23 @@ class RetireJSScanner(BaseScanner):
                 if _cache_is_fresh():
                     age_days = (time.time() - DB_CACHE_FILE.stat().st_mtime) / 86400
                     if age_days > 25:
-                        findings.append(Finding(
-                            severity=Severity.INFO,
-                            title=f"Vulnerability database is {int(age_days)} days old",
-                            description="The retire.js vulnerability database may be outdated. Re-run the scan to refresh.",
-                            remediation="Delete the cache at ~/.whiterabbit/cache/jsrepository.json to force a refresh.",
-                            category="js-vuln",
-                            scanner="retirejs",
-                        ))
+                        findings.append(
+                            Finding(
+                                severity=Severity.INFO,
+                                title=f"Vulnerability database is {int(age_days)} days old",
+                                description="The retire.js vulnerability database may be outdated. Re-run the scan to refresh.",
+                                remediation="Delete the cache at ~/.whiterabbit/cache/jsrepository.json to force a refresh.",
+                                category="js-vuln",
+                                scanner="retirejs",
+                            )
+                        )
 
         except httpx.TimeoutException:
             return ScanResult(
                 target=target,
                 scanner_name=self.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error=f"Request timed out after {config.timeout}s",
             )
         except httpx.ConnectError:
@@ -283,7 +315,7 @@ class RetireJSScanner(BaseScanner):
                 target=target,
                 scanner_name=self.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error=f"Could not connect to {target}",
             )
         except Exception as exc:
@@ -291,7 +323,7 @@ class RetireJSScanner(BaseScanner):
                 target=target,
                 scanner_name=self.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error=str(exc) or f"{type(exc).__name__} (no details)",
             )
 
@@ -299,6 +331,6 @@ class RetireJSScanner(BaseScanner):
             target=target,
             scanner_name=self.name,
             started_at=started,
-            finished_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(UTC),
             findings=findings,
         )

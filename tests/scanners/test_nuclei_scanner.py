@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
+from unittest.mock import MagicMock, patch
 
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import Severity
@@ -44,23 +42,25 @@ class TestBuildCommand:
 
 class TestParseFinding:
     def test_valid_finding(self) -> None:
-        line = json.dumps({
-            "template-id": "git-config",
-            "info": {
-                "name": "Git Config Exposure",
-                "severity": "medium",
-                "description": "Git configuration file is publicly accessible.",
-                "tags": ["exposure", "git"],
-                "reference": ["https://example.com/ref"],
-                "classification": {
-                    "cve-id": ["CVE-2024-1234"],
-                    "cwe-id": ["CWE-200"],
+        line = json.dumps(
+            {
+                "template-id": "git-config",
+                "info": {
+                    "name": "Git Config Exposure",
+                    "severity": "medium",
+                    "description": "Git configuration file is publicly accessible.",
+                    "tags": ["exposure", "git"],
+                    "reference": ["https://example.com/ref"],
+                    "classification": {
+                        "cve-id": ["CVE-2024-1234"],
+                        "cwe-id": ["CWE-200"],
+                    },
+                    "remediation": "Block access to .git directory.",
                 },
-                "remediation": "Block access to .git directory.",
-            },
-            "matched-at": "https://example.com/.git/config",
-            "host": "https://example.com",
-        })
+                "matched-at": "https://example.com/.git/config",
+                "host": "https://example.com",
+            }
+        )
         finding = _parse_finding(line)
         assert finding is not None
         assert finding.severity == Severity.MEDIUM
@@ -72,45 +72,51 @@ class TestParseFinding:
         assert "Block access" in finding.remediation
 
     def test_critical_finding(self) -> None:
-        line = json.dumps({
-            "template-id": "env-file",
-            "info": {
-                "name": "Environment File Exposed",
-                "severity": "critical",
-                "description": ".env file is publicly accessible.",
-                "tags": ["exposure"],
-            },
-            "matched-at": "https://example.com/.env",
-        })
+        line = json.dumps(
+            {
+                "template-id": "env-file",
+                "info": {
+                    "name": "Environment File Exposed",
+                    "severity": "critical",
+                    "description": ".env file is publicly accessible.",
+                    "tags": ["exposure"],
+                },
+                "matched-at": "https://example.com/.env",
+            }
+        )
         finding = _parse_finding(line)
         assert finding is not None
         assert finding.severity == Severity.CRITICAL
 
     def test_info_finding(self) -> None:
-        line = json.dumps({
-            "template-id": "tech-detect",
-            "info": {
-                "name": "Nginx Detected",
-                "severity": "info",
-                "tags": ["tech"],
-            },
-            "matched-at": "https://example.com",
-        })
+        line = json.dumps(
+            {
+                "template-id": "tech-detect",
+                "info": {
+                    "name": "Nginx Detected",
+                    "severity": "info",
+                    "tags": ["tech"],
+                },
+                "matched-at": "https://example.com",
+            }
+        )
         finding = _parse_finding(line)
         assert finding is not None
         assert finding.severity == Severity.INFO
         assert finding.category == "tech"
 
     def test_misconfig_category(self) -> None:
-        line = json.dumps({
-            "template-id": "cors-misconfig",
-            "info": {
-                "name": "CORS Misconfiguration",
-                "severity": "high",
-                "tags": ["misconfig"],
-            },
-            "matched-at": "https://example.com",
-        })
+        line = json.dumps(
+            {
+                "template-id": "cors-misconfig",
+                "info": {
+                    "name": "CORS Misconfiguration",
+                    "severity": "high",
+                    "tags": ["misconfig"],
+                },
+                "matched-at": "https://example.com",
+            }
+        )
         finding = _parse_finding(line)
         assert finding is not None
         assert finding.category == "misconfig"
@@ -119,42 +125,48 @@ class TestParseFinding:
         assert _parse_finding("not json") is None
 
     def test_no_matched_at(self) -> None:
-        line = json.dumps({
-            "template-id": "test",
-            "info": {
-                "name": "Test Finding",
-                "severity": "low",
-                "tags": [],
-            },
-        })
+        line = json.dumps(
+            {
+                "template-id": "test",
+                "info": {
+                    "name": "Test Finding",
+                    "severity": "low",
+                    "tags": [],
+                },
+            }
+        )
         finding = _parse_finding(line)
         assert finding is not None
         assert finding.title == "Test Finding"
 
     def test_string_reference(self) -> None:
-        line = json.dumps({
-            "template-id": "test",
-            "info": {
-                "name": "Test",
-                "severity": "low",
-                "reference": "https://example.com",
-                "tags": [],
-            },
-        })
+        line = json.dumps(
+            {
+                "template-id": "test",
+                "info": {
+                    "name": "Test",
+                    "severity": "low",
+                    "reference": "https://example.com",
+                    "tags": [],
+                },
+            }
+        )
         finding = _parse_finding(line)
         assert finding is not None
         assert finding.references == ["https://example.com"]
 
     def test_string_cve_id(self) -> None:
-        line = json.dumps({
-            "template-id": "test",
-            "info": {
-                "name": "Test",
-                "severity": "low",
-                "classification": {"cve-id": "CVE-2024-0001"},
-                "tags": [],
-            },
-        })
+        line = json.dumps(
+            {
+                "template-id": "test",
+                "info": {
+                    "name": "Test",
+                    "severity": "low",
+                    "classification": {"cve-id": "CVE-2024-0001"},
+                    "tags": [],
+                },
+            }
+        )
         finding = _parse_finding(line)
         assert finding is not None
         assert finding.cve == "CVE-2024-0001"
@@ -169,26 +181,30 @@ class TestNucleiScanner:
 
     def test_successful_scan(self) -> None:
         findings_json = [
-            json.dumps({
-                "template-id": "git-config",
-                "info": {
-                    "name": "Git Config Exposure",
-                    "severity": "medium",
-                    "description": "Git config exposed.",
-                    "tags": ["exposure"],
-                },
-                "matched-at": "https://example.com/.git/config",
-            }),
-            json.dumps({
-                "template-id": "env-file",
-                "info": {
-                    "name": "Env File Exposed",
-                    "severity": "high",
-                    "description": ".env file exposed.",
-                    "tags": ["exposure"],
-                },
-                "matched-at": "https://example.com/.env",
-            }),
+            json.dumps(
+                {
+                    "template-id": "git-config",
+                    "info": {
+                        "name": "Git Config Exposure",
+                        "severity": "medium",
+                        "description": "Git config exposed.",
+                        "tags": ["exposure"],
+                    },
+                    "matched-at": "https://example.com/.git/config",
+                }
+            ),
+            json.dumps(
+                {
+                    "template-id": "env-file",
+                    "info": {
+                        "name": "Env File Exposed",
+                        "severity": "high",
+                        "description": ".env file exposed.",
+                        "tags": ["exposure"],
+                    },
+                    "matched-at": "https://example.com/.env",
+                }
+            ),
         ]
         stdout = "\n".join(findings_json).encode()
 
@@ -199,7 +215,10 @@ class TestNucleiScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 0
 
-        with patch("whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec", return_value=proc_mock):
+        with patch(
+            "whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec",
+            return_value=proc_mock,
+        ):
             scanner = NucleiScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -216,7 +235,10 @@ class TestNucleiScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 0
 
-        with patch("whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec", return_value=proc_mock):
+        with patch(
+            "whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec",
+            return_value=proc_mock,
+        ):
             scanner = NucleiScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -242,7 +264,10 @@ class TestNucleiScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 2
 
-        with patch("whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec", return_value=proc_mock):
+        with patch(
+            "whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec",
+            return_value=proc_mock,
+        ):
             scanner = NucleiScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -251,9 +276,12 @@ class TestNucleiScanner:
 
     def test_nuclei_timeout(self) -> None:
         async def mock_create(*args, **kwargs):
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
-        with patch("whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec", side_effect=mock_create):
+        with patch(
+            "whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec",
+            side_effect=mock_create,
+        ):
             scanner = NucleiScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig(timeout=10)))
 
@@ -285,7 +313,10 @@ class TestNucleiScanner:
             calls.append(args)
             return proc_mock
 
-        with patch("whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec", side_effect=capture_exec):
+        with patch(
+            "whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec",
+            side_effect=capture_exec,
+        ):
             scanner = NucleiScanner()
             asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -293,11 +324,13 @@ class TestNucleiScanner:
         assert "https://example.com" in cmd_args
 
     def test_exit_code_1_ok(self) -> None:
-        stdout = json.dumps({
-            "template-id": "test",
-            "info": {"name": "Test", "severity": "low", "tags": []},
-            "matched-at": "https://example.com",
-        }).encode()
+        stdout = json.dumps(
+            {
+                "template-id": "test",
+                "info": {"name": "Test", "severity": "low", "tags": []},
+                "matched-at": "https://example.com",
+            }
+        ).encode()
 
         async def mock_communicate() -> tuple[bytes, bytes]:
             return stdout, b""
@@ -306,7 +339,10 @@ class TestNucleiScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 1
 
-        with patch("whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec", return_value=proc_mock):
+        with patch(
+            "whiterabbit.scanner.nuclei_scanner.asyncio.create_subprocess_exec",
+            return_value=proc_mock,
+        ):
             scanner = NucleiScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 

@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import os
 import shutil
 import sys
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import Any
 
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import Finding, ScanResult, Severity
@@ -24,7 +26,7 @@ SEVERITY_MAP: dict[str, Severity] = {
     "OK": Severity.INFO,
 }
 
-VULN_FINDINGS: dict[str, dict] = {
+VULN_FINDINGS: dict[str, dict[str, Any]] = {
     "BEAST": {
         "title": "Server vulnerable to BEAST (CBC in TLS 1.0)",
         "severity": Severity.HIGH,
@@ -91,13 +93,25 @@ VULN_FINDINGS: dict[str, dict] = {
     },
 }
 
-SSL_SCANNER_TITLES = frozenset({
-    "SSLv2", "SSLv3", "TLS 1.0", "TLS 1.1", "TLS 1.3",
-    "Heartbleed", "ROBOT", "compression",
-    "expired", "self-signed", "hostname mismatch",
-    "weak cipher", "OCSP", "certificate chain",
-    "RSA key",
-})
+SSL_SCANNER_TITLES = frozenset(
+    {
+        "SSLv2",
+        "SSLv3",
+        "TLS 1.0",
+        "TLS 1.1",
+        "TLS 1.3",
+        "Heartbleed",
+        "ROBOT",
+        "compression",
+        "expired",
+        "self-signed",
+        "hostname mismatch",
+        "weak cipher",
+        "OCSP",
+        "certificate chain",
+        "RSA key",
+    }
+)
 
 
 def _is_duplicate_of_ssl_scanner(finding_id: str, finding_text: str) -> bool:
@@ -111,9 +125,7 @@ def _is_duplicate_of_ssl_scanner(finding_id: str, finding_text: str) -> bool:
         return True
     if "cert_expired" in id_lower or "cert_selfsigned" in id_lower:
         return True
-    if "cert_chain" in id_lower:
-        return True
-    return False
+    return "cert_chain" in id_lower
 
 
 _NOISE_PATTERNS = [
@@ -135,7 +147,7 @@ def _is_noise(finding_id: str, finding_text: str) -> bool:
     return False
 
 
-def _parse_testssl_finding(entry: dict) -> Finding | None:
+def _parse_testssl_finding(entry: dict[str, Any]) -> Finding | None:
     finding_id = entry.get("id", "")
     finding_text = entry.get("finding", "")
     severity_str = entry.get("severity", "INFO").upper()
@@ -212,7 +224,6 @@ class TestSSLScanner(BaseScanner):
     name = "testssl"
     display_name = "Deep TLS Scanner"
     description = "Deep TLS/SSL analysis using testssl.sh (complements SSLyze)"
-    required_binaries: list[str] = []
     min_timeout: int | None = 900
 
     def is_available(self) -> bool:
@@ -225,17 +236,20 @@ class TestSSLScanner(BaseScanner):
     def check_dependencies(self) -> list[str]:
         missing: list[str] = []
         if _find_testssl() is None:
-            missing.append(f"  'testssl.sh' not found on PATH (or set WHITERABBIT_TESTSSL_PATH)")
-        elif sys.platform == "win32" and not shutil.which("testssl.sh") and not _find_git_bash():
+            missing.append(
+                "  'testssl.sh' not found on PATH (or set WHITERABBIT_TESTSSL_PATH)"
+            )
+        elif (
+            sys.platform == "win32"
+            and not shutil.which("testssl.sh")
+            and not _find_git_bash()
+        ):
             missing.append("  Git Bash required to run testssl.sh on Windows")
         return missing
 
     async def scan(self, target: str, config: ScanConfig) -> ScanResult:
-        if "://" not in target:
-            url = f"https://{target}"
-        else:
-            url = target
-        started = datetime.now(timezone.utc)
+        url = f"https://{target}" if "://" not in target else target
+        started = datetime.now(UTC)
         findings: list[Finding] = []
 
         testssl_path = _find_testssl()
@@ -244,7 +258,7 @@ class TestSSLScanner(BaseScanner):
                 target=target,
                 scanner_name=self.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error="testssl.sh not found. Install: https://github.com/drwetter/testssl.sh#install",
             )
 
@@ -258,7 +272,7 @@ class TestSSLScanner(BaseScanner):
                     target=target,
                     scanner_name=self.name,
                     started_at=started,
-                    finished_at=datetime.now(timezone.utc),
+                    finished_at=datetime.now(UTC),
                     error="Git Bash required to run testssl.sh on Windows",
                 )
             script_posix = testssl_path.replace("\\", "/")
@@ -269,20 +283,26 @@ class TestSSLScanner(BaseScanner):
             os.close(fd)
             json_tmpfile_posix = json_tmpfile.replace("\\", "/")
             if len(json_tmpfile_posix) >= 2 and json_tmpfile_posix[1] == ":":
-                json_tmpfile_posix = "/" + json_tmpfile_posix[0].lower() + json_tmpfile_posix[2:]
+                json_tmpfile_posix = (
+                    "/" + json_tmpfile_posix[0].lower() + json_tmpfile_posix[2:]
+                )
             cmd = [
-                bash, "-c",
+                bash,
+                "-c",
                 f"export PATH='{testssl_dir}':$PATH; '{script_posix}' --jsonfile '{json_tmpfile_posix}' -U --quiet --color 0 --fast --warnings off '{url}'",
             ]
         else:
             cmd = [
                 testssl_path,
-                "--jsonfile", "-",
+                "--jsonfile",
+                "-",
                 "-U",
                 "--quiet",
-                "--color", "0",
+                "--color",
+                "0",
                 "--fast",
-                "--warnings", "off",
+                "--warnings",
+                "off",
                 url,
             ]
 
@@ -300,23 +320,22 @@ class TestSSLScanner(BaseScanner):
 
             if use_tempfile and json_tmpfile:
                 try:
-                    with open(json_tmpfile, "r", encoding="utf-8", errors="replace") as f:
+                    with open(json_tmpfile, encoding="utf-8", errors="replace") as f:
                         output = f.read().strip()
                 except FileNotFoundError:
                     output = ""
             else:
                 output = stdout.decode(errors="replace").strip()
 
-            if not output:
-                if proc.returncode not in (0, 1):
-                    error_msg = stderr.decode(errors="replace").strip()
-                    return ScanResult(
-                        target=target,
-                        scanner_name=self.name,
-                        started_at=started,
-                        finished_at=datetime.now(timezone.utc),
-                        error=f"testssl.sh exited with code {proc.returncode}: {error_msg}",
-                    )
+            if not output and proc.returncode not in (0, 1):
+                error_msg = stderr.decode(errors="replace").strip()
+                return ScanResult(
+                    target=target,
+                    scanner_name=self.name,
+                    started_at=started,
+                    finished_at=datetime.now(UTC),
+                    error=f"testssl.sh exited with code {proc.returncode}: {error_msg}",
+                )
 
             try:
                 entries = json.loads(output)
@@ -346,15 +365,15 @@ class TestSSLScanner(BaseScanner):
                 target=target,
                 scanner_name=self.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error="testssl.sh not found. Install: https://github.com/drwetter/testssl.sh#install",
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ScanResult(
                 target=target,
                 scanner_name=self.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error=f"testssl.sh timed out after {testssl_timeout}s",
             )
         except Exception as exc:
@@ -362,20 +381,18 @@ class TestSSLScanner(BaseScanner):
                 target=target,
                 scanner_name=self.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error=str(exc),
             )
         finally:
             if json_tmpfile:
-                try:
+                with contextlib.suppress(OSError):
                     os.unlink(json_tmpfile)
-                except OSError:
-                    pass
 
         return ScanResult(
             target=target,
             scanner_name=self.name,
             started_at=started,
-            finished_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(UTC),
             findings=findings,
         )

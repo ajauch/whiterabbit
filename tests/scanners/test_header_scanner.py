@@ -6,16 +6,15 @@ import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
-import pytest
 
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import Severity
 from whiterabbit.scanner.header_scanner import (
     HeaderScanner,
     _check_cookies,
-    _check_cors,
     _check_coop,
     _check_corp,
+    _check_cors,
     _check_csp,
     _check_hsts,
     _check_permissions_policy,
@@ -39,15 +38,17 @@ class TestCheckHSTS:
         assert "HSTS" in findings[0].title
 
     def test_present_hsts(self) -> None:
-        findings = _check_hsts(_make_headers({
-            "strict-transport-security": "max-age=31536000; includeSubDomains"
-        }))
+        findings = _check_hsts(
+            _make_headers(
+                {"strict-transport-security": "max-age=31536000; includeSubDomains"}
+            )
+        )
         assert len(findings) == 0
 
     def test_short_max_age(self) -> None:
-        findings = _check_hsts(_make_headers({
-            "strict-transport-security": "max-age=3600"
-        }))
+        findings = _check_hsts(
+            _make_headers({"strict-transport-security": "max-age=3600"})
+        )
         assert len(findings) == 1
         assert findings[0].severity == Severity.MEDIUM
         assert "3600" in findings[0].title
@@ -60,30 +61,40 @@ class TestCheckCSP:
         assert findings[0].severity == Severity.HIGH
 
     def test_present_csp(self) -> None:
-        findings = _check_csp(_make_headers({
-            "content-security-policy": "default-src 'self'"
-        }))
+        findings = _check_csp(
+            _make_headers({"content-security-policy": "default-src 'self'"})
+        )
         assert len(findings) == 0
 
     def test_unsafe_inline(self) -> None:
-        findings = _check_csp(_make_headers({
-            "content-security-policy": "default-src 'self'; script-src 'unsafe-inline'"
-        }))
+        findings = _check_csp(
+            _make_headers(
+                {
+                    "content-security-policy": "default-src 'self'; script-src 'unsafe-inline'"
+                }
+            )
+        )
         assert len(findings) == 1
         assert findings[0].severity == Severity.MEDIUM
         assert "unsafe-inline" in findings[0].title
 
     def test_unsafe_eval(self) -> None:
-        findings = _check_csp(_make_headers({
-            "content-security-policy": "default-src 'self'; script-src 'unsafe-eval'"
-        }))
+        findings = _check_csp(
+            _make_headers(
+                {
+                    "content-security-policy": "default-src 'self'; script-src 'unsafe-eval'"
+                }
+            )
+        )
         assert len(findings) == 1
         assert "unsafe-eval" in findings[0].title
 
     def test_both_unsafe(self) -> None:
-        findings = _check_csp(_make_headers({
-            "content-security-policy": "script-src 'unsafe-inline' 'unsafe-eval'"
-        }))
+        findings = _check_csp(
+            _make_headers(
+                {"content-security-policy": "script-src 'unsafe-inline' 'unsafe-eval'"}
+            )
+        )
         assert len(findings) == 2
 
 
@@ -94,15 +105,15 @@ class TestCheckXContentTypeOptions:
         assert findings[0].severity == Severity.MEDIUM
 
     def test_present(self) -> None:
-        findings = _check_x_content_type_options(_make_headers({
-            "x-content-type-options": "nosniff"
-        }))
+        findings = _check_x_content_type_options(
+            _make_headers({"x-content-type-options": "nosniff"})
+        )
         assert len(findings) == 0
 
     def test_wrong_value(self) -> None:
-        findings = _check_x_content_type_options(_make_headers({
-            "x-content-type-options": "none"
-        }))
+        findings = _check_x_content_type_options(
+            _make_headers({"x-content-type-options": "none"})
+        )
         assert len(findings) == 1
 
 
@@ -113,15 +124,13 @@ class TestCheckXFrameOptions:
         assert findings[0].severity == Severity.MEDIUM
 
     def test_xfo_present(self) -> None:
-        findings = _check_x_frame_options(_make_headers({
-            "x-frame-options": "DENY"
-        }))
+        findings = _check_x_frame_options(_make_headers({"x-frame-options": "DENY"}))
         assert len(findings) == 0
 
     def test_csp_frame_ancestors(self) -> None:
-        findings = _check_x_frame_options(_make_headers({
-            "content-security-policy": "frame-ancestors 'none'"
-        }))
+        findings = _check_x_frame_options(
+            _make_headers({"content-security-policy": "frame-ancestors 'none'"})
+        )
         assert len(findings) == 0
 
 
@@ -132,9 +141,9 @@ class TestCheckReferrerPolicy:
         assert findings[0].severity == Severity.LOW
 
     def test_present(self) -> None:
-        findings = _check_referrer_policy(_make_headers({
-            "referrer-policy": "strict-origin-when-cross-origin"
-        }))
+        findings = _check_referrer_policy(
+            _make_headers({"referrer-policy": "strict-origin-when-cross-origin"})
+        )
         assert len(findings) == 0
 
 
@@ -145,9 +154,9 @@ class TestCheckPermissionsPolicy:
         assert findings[0].severity == Severity.LOW
 
     def test_present(self) -> None:
-        findings = _check_permissions_policy(_make_headers({
-            "permissions-policy": "camera=(), microphone=()"
-        }))
+        findings = _check_permissions_policy(
+            _make_headers({"permissions-policy": "camera=(), microphone=()"})
+        )
         assert len(findings) == 0
 
 
@@ -186,9 +195,9 @@ class TestCheckCOOP:
         assert findings[0].severity == Severity.LOW
 
     def test_present(self) -> None:
-        findings = _check_coop(_make_headers({
-            "cross-origin-opener-policy": "same-origin"
-        }))
+        findings = _check_coop(
+            _make_headers({"cross-origin-opener-policy": "same-origin"})
+        )
         assert len(findings) == 0
 
 
@@ -199,9 +208,9 @@ class TestCheckCORP:
         assert findings[0].severity == Severity.LOW
 
     def test_present(self) -> None:
-        findings = _check_corp(_make_headers({
-            "cross-origin-resource-policy": "same-origin"
-        }))
+        findings = _check_corp(
+            _make_headers({"cross-origin-resource-policy": "same-origin"})
+        )
         assert len(findings) == 0
 
 
@@ -211,15 +220,13 @@ class TestCheckCORS:
         assert len(findings) == 0
 
     def test_specific_origin(self) -> None:
-        findings = _check_cors(_make_headers({
-            "access-control-allow-origin": "https://example.com"
-        }))
+        findings = _check_cors(
+            _make_headers({"access-control-allow-origin": "https://example.com"})
+        )
         assert len(findings) == 0
 
     def test_wildcard(self) -> None:
-        findings = _check_cors(_make_headers({
-            "access-control-allow-origin": "*"
-        }))
+        findings = _check_cors(_make_headers({"access-control-allow-origin": "*"}))
         assert len(findings) == 1
         assert findings[0].severity == Severity.MEDIUM
 
@@ -227,9 +234,7 @@ class TestCheckCORS:
 class TestCheckCookies:
     def _make_response(self, cookies: list[str]) -> httpx.Response:
         response = MagicMock(spec=httpx.Response)
-        response.headers = httpx.Headers(
-            [(b"set-cookie", c.encode()) for c in cookies]
-        )
+        response.headers = httpx.Headers([(b"set-cookie", c.encode()) for c in cookies])
         return response
 
     def test_no_cookies(self) -> None:
@@ -269,10 +274,12 @@ class TestCheckCookies:
         assert len(findings) == 3
 
     def test_multiple_cookies(self) -> None:
-        response = self._make_response([
-            "sid=abc; Secure; HttpOnly; SameSite=Lax",
-            "prefs=dark",
-        ])
+        response = self._make_response(
+            [
+                "sid=abc; Secure; HttpOnly; SameSite=Lax",
+                "prefs=dark",
+            ]
+        )
         findings = _check_cookies(response)
         assert len(findings) == 3
 
@@ -307,7 +314,10 @@ class TestHeaderScannerEndToEnd:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("whiterabbit.scanner.header_scanner.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "whiterabbit.scanner.header_scanner.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             scanner = HeaderScanner()
             result = asyncio.run(scanner.scan("https://example.com", ScanConfig()))
             assert result.error is None
@@ -331,7 +341,10 @@ class TestHeaderScannerEndToEnd:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("whiterabbit.scanner.header_scanner.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "whiterabbit.scanner.header_scanner.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             scanner = HeaderScanner()
             result = asyncio.run(scanner.scan("https://example.com", ScanConfig()))
             assert result.error is None
@@ -343,7 +356,10 @@ class TestHeaderScannerEndToEnd:
         mock_client.__aenter__ = AsyncMock(return_value=mock_client)
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
-        with patch("whiterabbit.scanner.header_scanner.httpx.AsyncClient", return_value=mock_client):
+        with patch(
+            "whiterabbit.scanner.header_scanner.httpx.AsyncClient",
+            return_value=mock_client,
+        ):
             scanner = HeaderScanner()
             result = asyncio.run(scanner.scan("https://nope.invalid", ScanConfig()))
             assert result.error is not None

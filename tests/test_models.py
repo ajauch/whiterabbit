@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from whiterabbit.report.models import Finding, ScanReport, ScanResult, Severity
 
@@ -64,8 +64,8 @@ class TestScanResult:
         r = ScanResult(
             target="example.com",
             scanner_name="test",
-            started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            finished_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
+            started_at=datetime(2026, 1, 1, tzinfo=UTC),
+            finished_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
         )
         assert r.findings == []
         assert r.error is None
@@ -74,8 +74,8 @@ class TestScanResult:
         r = ScanResult(
             target="example.com",
             scanner_name="test",
-            started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-            finished_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=timezone.utc),
+            started_at=datetime(2026, 1, 1, tzinfo=UTC),
+            finished_at=datetime(2026, 1, 1, 0, 0, 10, tzinfo=UTC),
             error="Connection refused",
         )
         assert r.error == "Connection refused"
@@ -97,7 +97,7 @@ class TestScanReport:
     def test_empty_report(self) -> None:
         r = ScanReport(
             target="clean.example.com",
-            scan_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            scan_date=datetime(2026, 1, 1, tzinfo=UTC),
             duration_seconds=5.0,
             grade="A+",
             summary={s: 0 for s in Severity},

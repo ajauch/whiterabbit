@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -17,7 +17,6 @@ class FakeScanner(BaseScanner):
     name = "fake"
     display_name = "Fake Scanner"
     description = "A fake scanner for testing"
-    required_binaries: list[str] = []
 
     def __init__(self, findings: list[Finding] | None = None, delay: float = 0) -> None:
         self._findings = findings or []
@@ -29,8 +28,8 @@ class FakeScanner(BaseScanner):
         return ScanResult(
             target=target,
             scanner_name=self.name,
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc),
+            started_at=datetime.now(UTC),
+            finished_at=datetime.now(UTC),
             findings=self._findings,
         )
 
@@ -39,7 +38,6 @@ class ErrorScanner(BaseScanner):
     name = "error"
     display_name = "Error Scanner"
     description = "Always errors"
-    required_binaries: list[str] = []
 
     async def scan(self, target: str, config: ScanConfig) -> ScanResult:
         raise RuntimeError("Scanner exploded")

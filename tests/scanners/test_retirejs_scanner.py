@@ -4,10 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
-import pytest
 
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import Severity
@@ -23,14 +22,14 @@ from whiterabbit.scanner.retirejs_scanner import (
 
 class TestExtractScriptUrls:
     def test_basic_script_tags(self) -> None:
-        html = '''
+        html = """
         <html>
         <head>
             <script src="js/jquery-3.6.0.min.js"></script>
             <script src="/static/app.js"></script>
         </head>
         </html>
-        '''
+        """
         urls = _extract_script_urls(html, "https://example.com/page")
         assert len(urls) == 2
         assert "https://example.com/js/jquery-3.6.0.min.js" in urls
@@ -93,14 +92,18 @@ class TestExtractVersionFromFilename:
         extractors = {
             "uri": [r"jquery-(\d+\.\d+\.\d+)"],
         }
-        v = _extract_version_from_filename("https://example.com/jquery-3.6.0.min.js", extractors)
+        v = _extract_version_from_filename(
+            "https://example.com/jquery-3.6.0.min.js", extractors
+        )
         assert v == "3.6.0"
 
     def test_filename_pattern(self) -> None:
         extractors = {
             "filename": [r"bootstrap-(\d+\.\d+\.\d+)"],
         }
-        v = _extract_version_from_filename("https://example.com/bootstrap-5.2.3.js", extractors)
+        v = _extract_version_from_filename(
+            "https://example.com/bootstrap-5.2.3.js", extractors
+        )
         assert v == "5.2.3"
 
     def test_no_match(self) -> None:
@@ -202,7 +205,9 @@ MOCK_VULN_DB = {
                     "CVE": ["CVE-2020-11022"],
                     "summary": "XSS in jQuery.htmlPrefilter",
                 },
-                "info": ["https://github.com/jquery/jquery/security/advisories/GHSA-gxr4-xjj5-5px2"],
+                "info": [
+                    "https://github.com/jquery/jquery/security/advisories/GHSA-gxr4-xjj5-5px2"
+                ],
             },
         ],
     },
@@ -220,22 +225,31 @@ class TestRetireJSScanner:
         html = '<html><head><script src="/js/jquery-3.4.1.min.js"></script></head><body></body></html>'
 
         responses = {
-            "https://example.com": httpx.Response(200, text=html, request=httpx.Request("GET", "https://example.com")),
+            "https://example.com": httpx.Response(
+                200, text=html, request=httpx.Request("GET", "https://example.com")
+            ),
         }
 
         async def mock_get(url, **kwargs):
             if isinstance(url, str) and url in responses:
                 return responses[url]
-            return httpx.Response(200, text=json.dumps(MOCK_VULN_DB), request=httpx.Request("GET", url))
+            return httpx.Response(
+                200, text=json.dumps(MOCK_VULN_DB), request=httpx.Request("GET", url)
+            )
 
         with (
-            patch("whiterabbit.scanner.retirejs_scanner._cache_is_fresh", return_value=False),
-            patch("whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient") as MockClient,
+            patch(
+                "whiterabbit.scanner.retirejs_scanner._cache_is_fresh",
+                return_value=False,
+            ),
+            patch(
+                "whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient"
+            ) as mock_client_cls,
         ):
             client_instance = AsyncMock()
             client_instance.get = mock_get
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=client_instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             scanner = RetireJSScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
@@ -248,21 +262,34 @@ class TestRetireJSScanner:
         assert finding.cve == "CVE-2020-11022"
 
     def test_no_vulnerable_libs(self) -> None:
-        html = '<html><head><script src="/js/app.js"></script></head><body></body></html>'
+        html = (
+            '<html><head><script src="/js/app.js"></script></head><body></body></html>'
+        )
 
         async def mock_get(url, **kwargs):
             if "example.com" in str(url) and "jsrepository" not in str(url):
-                return httpx.Response(200, text=html, request=httpx.Request("GET", str(url)))
-            return httpx.Response(200, text=json.dumps(MOCK_VULN_DB), request=httpx.Request("GET", str(url)))
+                return httpx.Response(
+                    200, text=html, request=httpx.Request("GET", str(url))
+                )
+            return httpx.Response(
+                200,
+                text=json.dumps(MOCK_VULN_DB),
+                request=httpx.Request("GET", str(url)),
+            )
 
         with (
-            patch("whiterabbit.scanner.retirejs_scanner._cache_is_fresh", return_value=False),
-            patch("whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient") as MockClient,
+            patch(
+                "whiterabbit.scanner.retirejs_scanner._cache_is_fresh",
+                return_value=False,
+            ),
+            patch(
+                "whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient"
+            ) as mock_client_cls,
         ):
             client_instance = AsyncMock()
             client_instance.get = mock_get
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=client_instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             scanner = RetireJSScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
@@ -271,13 +298,20 @@ class TestRetireJSScanner:
         assert len(result.findings) == 0
 
     def test_timeout_error(self) -> None:
-        with patch("whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient") as MockClient:
+        with patch(
+            "whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient"
+        ) as mock_client_cls:
             client_instance = AsyncMock()
-            client_instance.get = AsyncMock(side_effect=httpx.TimeoutException("timeout"))
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=client_instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            client_instance.get = AsyncMock(
+                side_effect=httpx.TimeoutException("timeout")
+            )
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            with patch("whiterabbit.scanner.retirejs_scanner._cache_is_fresh", return_value=False):
+            with patch(
+                "whiterabbit.scanner.retirejs_scanner._cache_is_fresh",
+                return_value=False,
+            ):
                 scanner = RetireJSScanner()
                 result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -285,13 +319,18 @@ class TestRetireJSScanner:
         assert "timed out" in result.error
 
     def test_general_exception(self) -> None:
-        with patch("whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient") as MockClient:
+        with patch(
+            "whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient"
+        ) as mock_client_cls:
             client_instance = AsyncMock()
             client_instance.get = AsyncMock(side_effect=RuntimeError("network error"))
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=client_instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            with patch("whiterabbit.scanner.retirejs_scanner._cache_is_fresh", return_value=False):
+            with patch(
+                "whiterabbit.scanner.retirejs_scanner._cache_is_fresh",
+                return_value=False,
+            ):
                 scanner = RetireJSScanner()
                 result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -299,49 +338,75 @@ class TestRetireJSScanner:
         assert "network error" in result.error
 
     def test_content_based_detection(self) -> None:
-        html = '<html><head></head><body><script>/*! jQuery v3.4.1 | MIT */</script></body></html>'
+        html = "<html><head></head><body><script>/*! jQuery v3.4.1 | MIT */</script></body></html>"
 
         async def mock_get(url, **kwargs):
             if "example.com" in str(url) and "jsrepository" not in str(url):
-                return httpx.Response(200, text=html, request=httpx.Request("GET", str(url)))
-            return httpx.Response(200, text=json.dumps(MOCK_VULN_DB), request=httpx.Request("GET", str(url)))
+                return httpx.Response(
+                    200, text=html, request=httpx.Request("GET", str(url))
+                )
+            return httpx.Response(
+                200,
+                text=json.dumps(MOCK_VULN_DB),
+                request=httpx.Request("GET", str(url)),
+            )
 
         with (
-            patch("whiterabbit.scanner.retirejs_scanner._cache_is_fresh", return_value=False),
-            patch("whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient") as MockClient,
+            patch(
+                "whiterabbit.scanner.retirejs_scanner._cache_is_fresh",
+                return_value=False,
+            ),
+            patch(
+                "whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient"
+            ) as mock_client_cls,
         ):
             client_instance = AsyncMock()
             client_instance.get = mock_get
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=client_instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             scanner = RetireJSScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
         assert result.error is None
-        vuln_findings = [f for f in result.findings if f.category == "js-vuln" and "jquery" in f.title.lower()]
+        vuln_findings = [
+            f
+            for f in result.findings
+            if f.category == "js-vuln" and "jquery" in f.title.lower()
+        ]
         assert len(vuln_findings) >= 1
 
     def test_deduplication(self) -> None:
-        html = '''<html><head>
+        html = """<html><head>
             <script src="/js/jquery-3.4.1.min.js"></script>
         </head><body>
             <script>/*! jQuery v3.4.1 | MIT */</script>
-        </body></html>'''
+        </body></html>"""
 
         async def mock_get(url, **kwargs):
             if "example.com" in str(url) and "jsrepository" not in str(url):
-                return httpx.Response(200, text=html, request=httpx.Request("GET", str(url)))
-            return httpx.Response(200, text=json.dumps(MOCK_VULN_DB), request=httpx.Request("GET", str(url)))
+                return httpx.Response(
+                    200, text=html, request=httpx.Request("GET", str(url))
+                )
+            return httpx.Response(
+                200,
+                text=json.dumps(MOCK_VULN_DB),
+                request=httpx.Request("GET", str(url)),
+            )
 
         with (
-            patch("whiterabbit.scanner.retirejs_scanner._cache_is_fresh", return_value=False),
-            patch("whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient") as MockClient,
+            patch(
+                "whiterabbit.scanner.retirejs_scanner._cache_is_fresh",
+                return_value=False,
+            ),
+            patch(
+                "whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient"
+            ) as mock_client_cls,
         ):
             client_instance = AsyncMock()
             client_instance.get = mock_get
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=client_instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             scanner = RetireJSScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
@@ -355,17 +420,28 @@ class TestRetireJSScanner:
 
         async def mock_get(url, **kwargs):
             if "example.com" in str(url) and "jsrepository" not in str(url):
-                return httpx.Response(200, text=html, request=httpx.Request("GET", str(url)))
-            return httpx.Response(200, text=json.dumps(MOCK_VULN_DB), request=httpx.Request("GET", str(url)))
+                return httpx.Response(
+                    200, text=html, request=httpx.Request("GET", str(url))
+                )
+            return httpx.Response(
+                200,
+                text=json.dumps(MOCK_VULN_DB),
+                request=httpx.Request("GET", str(url)),
+            )
 
         with (
-            patch("whiterabbit.scanner.retirejs_scanner._cache_is_fresh", return_value=False),
-            patch("whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient") as MockClient,
+            patch(
+                "whiterabbit.scanner.retirejs_scanner._cache_is_fresh",
+                return_value=False,
+            ),
+            patch(
+                "whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient"
+            ) as mock_client_cls,
         ):
             client_instance = AsyncMock()
             client_instance.get = mock_get
-            MockClient.return_value.__aenter__ = AsyncMock(return_value=client_instance)
-            MockClient.return_value.__aexit__ = AsyncMock(return_value=False)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             scanner = RetireJSScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))

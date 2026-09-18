@@ -7,7 +7,7 @@ import csv
 import logging
 import threading
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -20,7 +20,7 @@ from whiterabbit.config import ScanConfig
 from whiterabbit.report.formatters.html import write_html
 from whiterabbit.report.formatters.json import format_json, write_json
 from whiterabbit.report.formatters.terminal import format_terminal
-from whiterabbit.report.models import Severity
+from whiterabbit.report.models import ScanReport, Severity
 from whiterabbit.runner import ScanRunner
 from whiterabbit.scanner import get_all_scanners
 
@@ -34,28 +34,33 @@ def _setup_logging(verbose: bool = False) -> None:
     logger.setLevel(logging.DEBUG if verbose else logging.INFO)
     if not logger.handlers:
         fh = logging.FileHandler(LOG_PATH, encoding="utf-8")
-        fh.setFormatter(logging.Formatter(
-            "%(asctime)s %(levelname)-5s %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        ))
+        fh.setFormatter(
+            logging.Formatter(
+                "%(asctime)s %(levelname)-5s %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+        )
         logger.addHandler(fh)
 
 
-def _append_csv(report: object) -> None:
+def _append_csv(report: ScanReport) -> None:
     write_header = not CSV_PATH.exists()
     with CSV_PATH.open("a", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
         if write_header:
             writer.writerow(CSV_HEADERS)
-        writer.writerow([
-            report.target,
-            report.scan_date.strftime("%Y-%m-%d"),
-            report.scan_date.strftime("%H:%M:%S"),
-            report.grade,
-            report.summary.get(Severity.HIGH, 0),
-            report.summary.get(Severity.MEDIUM, 0),
-            report.summary.get(Severity.LOW, 0),
-        ])
+        writer.writerow(
+            [
+                report.target,
+                report.scan_date.strftime("%Y-%m-%d"),
+                report.scan_date.strftime("%H:%M:%S"),
+                report.grade,
+                report.summary.get(Severity.HIGH, 0),
+                report.summary.get(Severity.MEDIUM, 0),
+                report.summary.get(Severity.LOW, 0),
+            ]
+        )
+
 
 app = typer.Typer(
     name="whiterabbit",
@@ -76,9 +81,14 @@ def version_callback(value: bool) -> None:
 @app.callback()
 def main(
     version: Annotated[
-        Optional[bool],
-        typer.Option("--version", "-V", callback=version_callback, is_eager=True,
-                     help="Show version and exit."),
+        bool | None,
+        typer.Option(
+            "--version",
+            "-V",
+            callback=version_callback,
+            is_eager=True,
+            help="Show version and exit.",
+        ),
     ] = None,
 ) -> None:
     pass
@@ -110,7 +120,9 @@ def _build_progress_table(
     table.add_row("", header)
 
     for name, status in scanner_status.items():
-        icon = STATUS_ICONS.get(status.split(":")[0] if ":" in status else status, STATUS_ICONS["running"])
+        icon = STATUS_ICONS.get(
+            status.split(":")[0] if ":" in status else status, STATUS_ICONS["running"]
+        )
         detail = ""
         if status.startswith("error:"):
             detail = f" [dim]({status[6:].strip()})[/dim]"
@@ -123,13 +135,28 @@ def _build_progress_table(
 def scan(
     target: Annotated[str, typer.Argument(help="URL or hostname to scan.")],
     quick: Annotated[bool, typer.Option("--quick", help="Headers + SSL only.")] = False,
-    full: Annotated[bool, typer.Option("--full", help="All available scanners.")] = False,
-    scanners: Annotated[Optional[str], typer.Option("--scanners", help="Comma-separated scanner list.")] = None,
-    output: Annotated[Optional[str], typer.Option("--output", "-o", help="Write report to file (.json or .html).")] = None,
-    fmt: Annotated[str, typer.Option("--format", "-f", help="Output format: terminal, json, html.")] = "terminal",
-    timeout: Annotated[int, typer.Option("--timeout", help="Per-scanner timeout in seconds.")] = 300,
-    no_color: Annotated[bool, typer.Option("--no-color", help="Disable colored output.")] = False,
-    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed scanner output.")] = False,
+    full: Annotated[
+        bool, typer.Option("--full", help="All available scanners.")
+    ] = False,
+    scanners: Annotated[
+        str | None, typer.Option("--scanners", help="Comma-separated scanner list.")
+    ] = None,
+    output: Annotated[
+        str | None,
+        typer.Option("--output", "-o", help="Write report to file (.json or .html)."),
+    ] = None,
+    fmt: Annotated[
+        str, typer.Option("--format", "-f", help="Output format: terminal, json, html.")
+    ] = "terminal",
+    timeout: Annotated[
+        int, typer.Option("--timeout", help="Per-scanner timeout in seconds.")
+    ] = 300,
+    no_color: Annotated[
+        bool, typer.Option("--no-color", help="Disable colored output.")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show detailed scanner output.")
+    ] = False,
 ) -> None:
     """Scan a target for security issues."""
     _setup_logging(verbose)
@@ -179,7 +206,9 @@ def scan(
 
     if not scanner_instances:
         scan_log.error("no scanners available for %s", target)
-        console.print("[yellow]No scanners available. Running produces an empty report.[/yellow]")
+        console.print(
+            "[yellow]No scanners available. Running produces an empty report.[/yellow]"
+        )
 
     scanner_status: dict[str, str] = {
         s.display_name: "pending" for s in scanner_instances
@@ -192,17 +221,18 @@ def scan(
 
     runner = ScanRunner(on_progress=on_progress)
 
+    report_result: ScanReport | None = None
+
+    def run_scan() -> None:
+        nonlocal report_result
+        report_result = asyncio.run(runner.run(target, scanner_instances, config))
+
     with Live(
         _build_progress_table(target, scanner_status),
         console=console,
         transient=True,
         refresh_per_second=8,
     ) as live:
-        def run_scan() -> None:
-            nonlocal report_result
-            report_result = asyncio.run(runner.run(target, scanner_instances, config))
-
-        report_result = None  # type: ignore[assignment]
         thread = threading.Thread(target=run_scan)
         thread.start()
 
@@ -211,6 +241,7 @@ def scan(
                 live.update(_build_progress_table(target, scanner_status))
             thread.join(timeout=0.12)
 
+    assert report_result is not None
     report = report_result
     _append_csv(report)
 
@@ -225,7 +256,9 @@ def scan(
             write_html(report, output)
             console.print(f"HTML report written to {output}")
         else:
-            console.print("[yellow]HTML format requires --output. Use --format terminal for console output.[/yellow]")
+            console.print(
+                "[yellow]HTML format requires --output. Use --format terminal for console output.[/yellow]"
+            )
     else:
         format_terminal(report, console)
         if output:
@@ -252,7 +285,11 @@ def list_scanners() -> None:
 
     for name, cls in sorted(all_scanners.items()):
         instance = cls()
-        status = "[green]ready[/green]" if instance.is_available() else "[red]missing deps[/red]"
+        status = (
+            "[green]ready[/green]"
+            if instance.is_available()
+            else "[red]missing deps[/red]"
+        )
         table.add_row(name, instance.description, status)
 
     console.print(table)
@@ -267,7 +304,7 @@ def check_deps() -> None:
         return
 
     all_good = True
-    for name, cls in sorted(all_scanners.items()):
+    for _name, cls in sorted(all_scanners.items()):
         instance = cls()
         missing = instance.check_dependencies()
         if missing:
@@ -276,7 +313,9 @@ def check_deps() -> None:
             for line in missing:
                 console.print(f"  {line}")
         else:
-            console.print(f"[green]{instance.display_name}:[/green] all dependencies installed")
+            console.print(
+                f"[green]{instance.display_name}:[/green] all dependencies installed"
+            )
 
     if all_good:
         console.print("\n[green]All scanner dependencies are installed.[/green]")

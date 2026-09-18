@@ -8,8 +8,6 @@ import sys
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import Severity
 from whiterabbit.scanner.testssl_scanner import (
@@ -23,10 +21,16 @@ def _force_direct_path(stack: ExitStack) -> None:
     """Force the non-Windows (stdout-based) code path regardless of platform."""
     if sys.platform == "win32":
         stack.enter_context(
-            patch("whiterabbit.scanner.testssl_scanner._find_testssl", return_value="/usr/bin/testssl.sh")
+            patch(
+                "whiterabbit.scanner.testssl_scanner._find_testssl",
+                return_value="/usr/bin/testssl.sh",
+            )
         )
         stack.enter_context(
-            patch("whiterabbit.scanner.testssl_scanner.shutil.which", return_value="/usr/bin/testssl.sh")
+            patch(
+                "whiterabbit.scanner.testssl_scanner.shutil.which",
+                return_value="/usr/bin/testssl.sh",
+            )
         )
         stack.enter_context(
             patch("whiterabbit.scanner.testssl_scanner.sys.platform", "linux")
@@ -35,7 +39,10 @@ def _force_direct_path(stack: ExitStack) -> None:
 
 class TestIsDuplicateOfSSLScanner:
     def test_heartbleed_duplicate(self) -> None:
-        assert _is_duplicate_of_ssl_scanner("heartbleed", "Not vulnerable to Heartbleed") is True
+        assert (
+            _is_duplicate_of_ssl_scanner("heartbleed", "Not vulnerable to Heartbleed")
+            is True
+        )
 
     def test_robot_duplicate(self) -> None:
         assert _is_duplicate_of_ssl_scanner("ROBOT", "ROBOT test") is True
@@ -47,10 +54,15 @@ class TestIsDuplicateOfSSLScanner:
         assert _is_duplicate_of_ssl_scanner("sslv3", "SSLv3 offered") is True
 
     def test_cert_expired_duplicate(self) -> None:
-        assert _is_duplicate_of_ssl_scanner("cert_expired", "Certificate expired") is True
+        assert (
+            _is_duplicate_of_ssl_scanner("cert_expired", "Certificate expired") is True
+        )
 
     def test_cert_chain_duplicate(self) -> None:
-        assert _is_duplicate_of_ssl_scanner("cert_chain", "Certificate chain issue") is True
+        assert (
+            _is_duplicate_of_ssl_scanner("cert_chain", "Certificate chain issue")
+            is True
+        )
 
     def test_beast_not_duplicate(self) -> None:
         assert _is_duplicate_of_ssl_scanner("BEAST", "BEAST vulnerability") is False
@@ -81,7 +93,11 @@ class TestParseTestsslFinding:
         assert finding.cve == "CVE-2014-8730"
 
     def test_known_vuln_drown(self) -> None:
-        entry = {"id": "DROWN", "finding": "DROWN vulnerability", "severity": "CRITICAL"}
+        entry = {
+            "id": "DROWN",
+            "finding": "DROWN vulnerability",
+            "severity": "CRITICAL",
+        }
         finding = _parse_testssl_finding(entry)
         assert finding is not None
         assert finding.severity == Severity.CRITICAL
@@ -106,7 +122,11 @@ class TestParseTestsslFinding:
         assert finding.severity == Severity.MEDIUM
 
     def test_known_vuln_ticketbleed(self) -> None:
-        entry = {"id": "Ticketbleed", "finding": "Ticketbleed attack", "severity": "HIGH"}
+        entry = {
+            "id": "Ticketbleed",
+            "finding": "Ticketbleed attack",
+            "severity": "HIGH",
+        }
         finding = _parse_testssl_finding(entry)
         assert finding is not None
         assert finding.cve == "CVE-2016-9244"
@@ -138,7 +158,11 @@ class TestParseTestsslFinding:
         assert finding is None
 
     def test_heartbleed_duplicate_skipped(self) -> None:
-        entry = {"id": "heartbleed", "finding": "Heartbleed not vulnerable", "severity": "OK"}
+        entry = {
+            "id": "heartbleed",
+            "finding": "Heartbleed not vulnerable",
+            "severity": "OK",
+        }
         finding = _parse_testssl_finding(entry)
         assert finding is None
 
@@ -175,11 +199,17 @@ class TestTestSSLScanner:
         assert hasattr(scanner, "check_dependencies")
 
     def test_successful_scan_with_findings(self) -> None:
-        output = json.dumps([
-            {"id": "BEAST", "finding": "BEAST CBC in TLS 1.0", "severity": "HIGH"},
-            {"id": "SWEET32", "finding": "SWEET32 64-bit block", "severity": "MEDIUM"},
-            {"id": "some_ok", "finding": "All good", "severity": "OK"},
-        ]).encode()
+        output = json.dumps(
+            [
+                {"id": "BEAST", "finding": "BEAST CBC in TLS 1.0", "severity": "HIGH"},
+                {
+                    "id": "SWEET32",
+                    "finding": "SWEET32 64-bit block",
+                    "severity": "MEDIUM",
+                },
+                {"id": "some_ok", "finding": "All good", "severity": "OK"},
+            ]
+        ).encode()
 
         async def mock_communicate() -> tuple[bytes, bytes]:
             return output, b""
@@ -191,7 +221,10 @@ class TestTestSSLScanner:
         with ExitStack() as stack:
             _force_direct_path(stack)
             stack.enter_context(
-                patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock)
+                patch(
+                    "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+                    return_value=proc_mock,
+                )
             )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
@@ -203,10 +236,12 @@ class TestTestSSLScanner:
         assert any("SWEET32" in t for t in titles)
 
     def test_no_findings(self) -> None:
-        output = json.dumps([
-            {"id": "check1", "finding": "OK", "severity": "OK"},
-            {"id": "check2", "finding": "Info", "severity": "INFO"},
-        ]).encode()
+        output = json.dumps(
+            [
+                {"id": "check1", "finding": "OK", "severity": "OK"},
+                {"id": "check2", "finding": "Info", "severity": "INFO"},
+            ]
+        ).encode()
 
         async def mock_communicate() -> tuple[bytes, bytes]:
             return output, b""
@@ -215,7 +250,10 @@ class TestTestSSLScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 0
 
-        with patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock):
+        with patch(
+            "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+            return_value=proc_mock,
+        ):
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -223,11 +261,17 @@ class TestTestSSLScanner:
         assert len(result.findings) == 0
 
     def test_deduplicates_ssl_scanner_findings(self) -> None:
-        output = json.dumps([
-            {"id": "heartbleed", "finding": "Heartbleed not vulnerable", "severity": "OK"},
-            {"id": "sslv2", "finding": "SSLv2 offered", "severity": "CRITICAL"},
-            {"id": "BEAST", "finding": "BEAST CBC in TLS 1.0", "severity": "HIGH"},
-        ]).encode()
+        output = json.dumps(
+            [
+                {
+                    "id": "heartbleed",
+                    "finding": "Heartbleed not vulnerable",
+                    "severity": "OK",
+                },
+                {"id": "sslv2", "finding": "SSLv2 offered", "severity": "CRITICAL"},
+                {"id": "BEAST", "finding": "BEAST CBC in TLS 1.0", "severity": "HIGH"},
+            ]
+        ).encode()
 
         async def mock_communicate() -> tuple[bytes, bytes]:
             return output, b""
@@ -239,7 +283,10 @@ class TestTestSSLScanner:
         with ExitStack() as stack:
             _force_direct_path(stack)
             stack.enter_context(
-                patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock)
+                patch(
+                    "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+                    return_value=proc_mock,
+                )
             )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
@@ -267,7 +314,10 @@ class TestTestSSLScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 2
 
-        with patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock):
+        with patch(
+            "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+            return_value=proc_mock,
+        ):
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -276,9 +326,12 @@ class TestTestSSLScanner:
 
     def test_testssl_timeout(self) -> None:
         async def mock_create(*args, **kwargs):
-            raise asyncio.TimeoutError()
+            raise TimeoutError()
 
-        with patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", side_effect=mock_create):
+        with patch(
+            "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+            side_effect=mock_create,
+        ):
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig(timeout=10)))
 
@@ -299,7 +352,9 @@ class TestTestSSLScanner:
     def test_jsonl_output_format(self) -> None:
         lines = [
             json.dumps({"id": "BEAST", "finding": "BEAST CBC", "severity": "HIGH"}),
-            json.dumps({"id": "Logjam", "finding": "Logjam weak DH", "severity": "HIGH"}),
+            json.dumps(
+                {"id": "Logjam", "finding": "Logjam weak DH", "severity": "HIGH"}
+            ),
         ]
         output = "\n".join(lines).encode()
 
@@ -313,7 +368,10 @@ class TestTestSSLScanner:
         with ExitStack() as stack:
             _force_direct_path(stack)
             stack.enter_context(
-                patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock)
+                patch(
+                    "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+                    return_value=proc_mock,
+                )
             )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
@@ -340,7 +398,10 @@ class TestTestSSLScanner:
         with ExitStack() as stack:
             _force_direct_path(stack)
             stack.enter_context(
-                patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", side_effect=capture_exec)
+                patch(
+                    "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+                    side_effect=capture_exec,
+                )
             )
             scanner = TestSSLScanner()
             asyncio.run(scanner.scan("example.com", ScanConfig()))
@@ -356,7 +417,10 @@ class TestTestSSLScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 0
 
-        with patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock):
+        with patch(
+            "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
+            return_value=proc_mock,
+        ):
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 

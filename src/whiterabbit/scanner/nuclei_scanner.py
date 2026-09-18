@@ -4,16 +4,26 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from typing import ClassVar
 
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import Finding, ScanResult, Severity
 from whiterabbit.scanner.base import BaseScanner
 
-EXCLUDED_TAGS = frozenset({
-    "fuzz", "exploit", "intrusive", "dos", "brute",
-    "sqli", "xss", "rce", "auth-bypass",
-})
+EXCLUDED_TAGS = frozenset(
+    {
+        "fuzz",
+        "exploit",
+        "intrusive",
+        "dos",
+        "brute",
+        "sqli",
+        "xss",
+        "rce",
+        "auth-bypass",
+    }
+)
 
 DEFAULT_TAGS = ["exposure", "misconfig", "tech"]
 
@@ -35,12 +45,16 @@ def _normalize_target(target: str) -> str:
 def _build_command(target: str, tags: list[str], timeout: int) -> list[str]:
     cmd = [
         "nuclei",
-        "-u", target,
+        "-u",
+        target,
         "-jsonl",
         "-silent",
-        "-tags", ",".join(tags),
-        "-exclude-tags", ",".join(sorted(EXCLUDED_TAGS)),
-        "-timeout", str(timeout),
+        "-tags",
+        ",".join(tags),
+        "-exclude-tags",
+        ",".join(sorted(EXCLUDED_TAGS)),
+        "-timeout",
+        str(timeout),
         "-no-color",
     ]
     return cmd
@@ -83,7 +97,10 @@ def _parse_finding(line: str) -> Finding | None:
     if isinstance(tags, str):
         tags = [t.strip() for t in tags.split(",")]
 
-    remediation = info.get("remediation", "Review the matched endpoint and apply appropriate security controls.")
+    remediation = info.get(
+        "remediation",
+        "Review the matched endpoint and apply appropriate security controls.",
+    )
 
     category = "nuclei"
     if any(t in tags for t in ("exposure", "exposed")):
@@ -110,12 +127,14 @@ def _parse_finding(line: str) -> Finding | None:
 class NucleiScanner(BaseScanner):
     name = "nuclei"
     display_name = "Nuclei Scanner"
-    description = "Detects misconfigurations and exposures using Nuclei (passive templates only)"
-    required_binaries: list[str] = ["nuclei"]
+    description = (
+        "Detects misconfigurations and exposures using Nuclei (passive templates only)"
+    )
+    required_binaries: ClassVar[list[str]] = ["nuclei"]
 
     async def scan(self, target: str, config: ScanConfig) -> ScanResult:
         url = _normalize_target(target)
-        started = datetime.now(timezone.utc)
+        started = datetime.now(UTC)
         findings: list[Finding] = []
 
         tags = list(DEFAULT_TAGS)
@@ -138,7 +157,7 @@ class NucleiScanner(BaseScanner):
                     target=target,
                     scanner_name=self.name,
                     started_at=started,
-                    finished_at=datetime.now(timezone.utc),
+                    finished_at=datetime.now(UTC),
                     error=f"Nuclei exited with code {proc.returncode}: {error_msg}",
                 )
 
@@ -155,15 +174,15 @@ class NucleiScanner(BaseScanner):
                 target=target,
                 scanner_name=self.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error="nuclei not found. Install: https://github.com/projectdiscovery/nuclei#install-nuclei",
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             return ScanResult(
                 target=target,
                 scanner_name=self.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error=f"Nuclei timed out after {config.timeout + 30}s",
             )
         except Exception as exc:
@@ -171,7 +190,7 @@ class NucleiScanner(BaseScanner):
                 target=target,
                 scanner_name=self.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error=str(exc),
             )
 
@@ -179,6 +198,6 @@ class NucleiScanner(BaseScanner):
             target=target,
             scanner_name=self.name,
             started_at=started,
-            finished_at=datetime.now(timezone.utc),
+            finished_at=datetime.now(UTC),
             findings=findings,
         )

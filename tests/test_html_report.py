@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import tempfile
+from datetime import UTC
 from pathlib import Path
 
 from whiterabbit.report.formatters.html import format_html, write_html
@@ -69,12 +70,13 @@ class TestHTMLReport:
         Path(path).unlink()
 
     def test_empty_report_shows_no_issues(self) -> None:
-        from datetime import datetime, timezone
+        from datetime import datetime
+
         from whiterabbit.report.models import Severity
 
         report = ScanReport(
             target="clean.example.com",
-            scan_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            scan_date=datetime(2026, 1, 1, tzinfo=UTC),
             duration_seconds=1.0,
             grade="A+",
             summary={s: 0 for s in Severity},

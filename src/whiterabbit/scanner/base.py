@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 from abc import ABC, abstractmethod
+from typing import ClassVar
 
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import ScanResult
@@ -13,12 +14,11 @@ class BaseScanner(ABC):
     name: str
     display_name: str
     description: str
-    required_binaries: list[str] = []
+    required_binaries: ClassVar[list[str]] = []
     min_timeout: int | None = None
 
     @abstractmethod
-    async def scan(self, target: str, config: ScanConfig) -> ScanResult:
-        ...
+    async def scan(self, target: str, config: ScanConfig) -> ScanResult: ...
 
     def effective_timeout(self, config: ScanConfig) -> int:
         if self.min_timeout is not None:

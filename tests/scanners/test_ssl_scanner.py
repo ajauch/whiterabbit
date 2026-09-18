@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
+from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import Severity
@@ -41,7 +38,7 @@ def _mock_cert(
     chain_valid: bool = True,
     ocsp_response: object | None = "present",
 ) -> MagicMock:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     leaf = MagicMock()
     if expired:
@@ -57,19 +54,21 @@ def _mock_cert(
         leaf.subject = MagicMock()
 
     from cryptography.hazmat.primitives.asymmetric import rsa
+
     key_mock = MagicMock(spec=rsa.RSAPublicKey)
     key_mock.key_size = key_size
     leaf.public_key.return_value = key_mock
 
     if san_names is not None:
-        from cryptography.x509 import SubjectAlternativeName, DNSName
         from cryptography.x509.oid import ExtensionOID
+
         san_ext = MagicMock()
         san_ext.value.get_values_for_type.return_value = san_names
         leaf.extensions.get_extension_for_oid.return_value = san_ext
     else:
         from cryptography.x509 import ExtensionNotFound
         from cryptography.x509.oid import ExtensionOID
+
         leaf.extensions.get_extension_for_oid.side_effect = ExtensionNotFound(
             "Not found", ExtensionOID.SUBJECT_ALTERNATIVE_NAME
         )
@@ -103,15 +102,17 @@ def _make_scan_results(
     robot_vulnerable: bool = False,
     compression: bool = False,
 ) -> MagicMock:
-    from sslyze import ScanCommandAttemptStatusEnum, RobotScanResultEnum
+    from sslyze import RobotScanResultEnum, ScanCommandAttemptStatusEnum
 
     results = MagicMock()
 
-    def make_cipher_attempt(count: int, cipher_names: list[str] | None = None) -> MagicMock:
+    def make_cipher_attempt(
+        count: int, cipher_names: list[str] | None = None
+    ) -> MagicMock:
         attempt = MagicMock()
         attempt.status = ScanCommandAttemptStatusEnum.COMPLETED
         suites = []
-        names = cipher_names or [f"TLS_AES_256_GCM_SHA384"] * count
+        names = cipher_names or ["TLS_AES_256_GCM_SHA384"] * count
         for name in names[:count] if not cipher_names else names:
             suite = MagicMock()
             suite.cipher_suite.name = name
@@ -166,14 +167,15 @@ def _make_scan_results(
 def _run_scan_with_mock(scan_results: MagicMock) -> list:
     """Patch SSLyze Scanner and run SSLScanner.scan(), returning findings."""
     import asyncio
+
     from sslyze import ServerScanStatusEnum
 
     server_result = MagicMock()
     server_result.scan_status = ServerScanStatusEnum.COMPLETED
     server_result.scan_result = scan_results
 
-    with patch("whiterabbit.scanner.ssl_scanner.Scanner") as MockScanner:
-        instance = MockScanner.return_value
+    with patch("whiterabbit.scanner.ssl_scanner.Scanner") as mock_scanner_cls:
+        instance = mock_scanner_cls.return_value
         instance.get_results.return_value = [server_result]
 
         scanner = SSLScanner()
@@ -185,14 +187,20 @@ class TestSSLScannerCertificate:
     def test_valid_cert_no_findings(self) -> None:
         results = _make_scan_results(tls13_accepted=3, tls12_accepted=2)
         findings = _run_scan_with_mock(results)
-        cert_findings = [f for f in findings if "ertificat" in f.title or "expired" in f.title.lower()]
+        cert_findings = [
+            f
+            for f in findings
+            if "ertificat" in f.title or "expired" in f.title.lower()
+        ]
         assert len(cert_findings) == 0
 
     def test_expired_cert(self) -> None:
         deploy = _mock_cert(expired=True)
         results = _make_scan_results(cert_deployments=[deploy], tls13_accepted=3)
         findings = _run_scan_with_mock(results)
-        expired = [f for f in findings if "expired" in f.title.lower() or "Expired" in f.title]
+        expired = [
+            f for f in findings if "expired" in f.title.lower() or "Expired" in f.title
+        ]
         assert len(expired) == 1
         assert expired[0].severity == Severity.CRITICAL
 
@@ -299,7 +307,10 @@ class TestSSLScannerVulnerabilities:
 
     def test_weak_ciphers(self) -> None:
         results = _make_scan_results(
-            weak_cipher_names=["TLS_RSA_WITH_RC4_128_SHA", "TLS_RSA_WITH_3DES_EDE_CBC_SHA"],
+            weak_cipher_names=[
+                "TLS_RSA_WITH_RC4_128_SHA",
+                "TLS_RSA_WITH_3DES_EDE_CBC_SHA",
+            ],
             tls13_accepted=3,
         )
         findings = _run_scan_with_mock(results)
@@ -319,6 +330,7 @@ class TestSSLScannerCleanSite:
 class TestSSLScannerErrors:
     def test_connection_failure(self) -> None:
         import asyncio
+
         from sslyze import ServerScanStatusEnum
 
         server_result = MagicMock()
@@ -326,9 +338,9 @@ class TestSSLScannerErrors:
 
         with (
             patch("whiterabbit.scanner.ssl_scanner.ServerNetworkLocation"),
-            patch("whiterabbit.scanner.ssl_scanner.Scanner") as MockScanner,
+            patch("whiterabbit.scanner.ssl_scanner.Scanner") as mock_scanner_cls,
         ):
-            instance = MockScanner.return_value
+            instance = mock_scanner_cls.return_value
             instance.get_results.return_value = [server_result]
 
             scanner = SSLScanner()
@@ -339,8 +351,8 @@ class TestSSLScannerErrors:
     def test_exception_during_scan(self) -> None:
         import asyncio
 
-        with patch("whiterabbit.scanner.ssl_scanner.Scanner") as MockScanner:
-            MockScanner.side_effect = RuntimeError("SSLyze crashed")
+        with patch("whiterabbit.scanner.ssl_scanner.Scanner") as mock_scanner_cls:
+            mock_scanner_cls.side_effect = RuntimeError("SSLyze crashed")
 
             scanner = SSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))

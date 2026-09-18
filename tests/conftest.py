@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -79,8 +79,8 @@ def sample_scan_result(sample_findings: list[Finding]) -> ScanResult:
     return ScanResult(
         target="example.com",
         scanner_name="test_scanner",
-        started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-        finished_at=datetime(2026, 1, 1, 0, 0, 30, tzinfo=timezone.utc),
+        started_at=datetime(2026, 1, 1, tzinfo=UTC),
+        finished_at=datetime(2026, 1, 1, 0, 0, 30, tzinfo=UTC),
         findings=sample_findings,
     )
 
@@ -89,7 +89,7 @@ def sample_scan_result(sample_findings: list[Finding]) -> ScanResult:
 def sample_report(sample_scan_result: ScanResult) -> ScanReport:
     return ScanReport(
         target="example.com",
-        scan_date=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        scan_date=datetime(2026, 1, 1, tzinfo=UTC),
         duration_seconds=30.0,
         grade="F",
         summary={

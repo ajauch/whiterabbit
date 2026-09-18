@@ -1,5 +1,7 @@
 # WhiteRabbit
 
+[![CI](https://github.com/ajauch/whiterabbit/actions/workflows/ci.yml/badge.svg)](https://github.com/ajauch/whiterabbit/actions/workflows/ci.yml)
+
 **Grade the security posture of a deployed web application — in one command.**
 
 Agent-written code ships fast, but it ships with a predictable set of security

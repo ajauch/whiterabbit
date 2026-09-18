@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 from whiterabbit import __version__
 from whiterabbit.report.grader import compute_grade
@@ -32,20 +33,29 @@ class ScanRunner:
         self, scanner: BaseScanner, target: str, config: ScanConfig
     ) -> ScanResult:
         self._report_progress(scanner.display_name, "running")
-        log.info("[%s] starting against %s (timeout=%ss)", scanner.name, target, scanner.effective_timeout(config))
-        started = datetime.now(timezone.utc)
+        log.info(
+            "[%s] starting against %s (timeout=%ss)",
+            scanner.name,
+            target,
+            scanner.effective_timeout(config),
+        )
+        started = datetime.now(UTC)
         try:
             result = await asyncio.wait_for(
                 scanner.scan(target, config),
                 timeout=scanner.effective_timeout(config),
             )
-        except asyncio.TimeoutError:
-            log.error("[%s] timed out after %ss", scanner.name, scanner.effective_timeout(config))
+        except TimeoutError:
+            log.error(
+                "[%s] timed out after %ss",
+                scanner.name,
+                scanner.effective_timeout(config),
+            )
             result = ScanResult(
                 target=target,
                 scanner_name=scanner.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error=f"Scanner timed out after {scanner.effective_timeout(config)}s",
             )
         except Exception as exc:
@@ -54,7 +64,7 @@ class ScanRunner:
                 target=target,
                 scanner_name=scanner.name,
                 started_at=started,
-                finished_at=datetime.now(timezone.utc),
+                finished_at=datetime.now(UTC),
                 error=str(exc) or f"{type(exc).__name__} (no details)",
             )
 
@@ -63,9 +73,19 @@ class ScanRunner:
 
         elapsed = (result.finished_at - result.started_at).total_seconds()
         if result.error is not None:
-            log.error("[%s] finished with error (%.1fs): %s", scanner.name, elapsed, result.error)
+            log.error(
+                "[%s] finished with error (%.1fs): %s",
+                scanner.name,
+                elapsed,
+                result.error,
+            )
         else:
-            log.info("[%s] finished OK (%.1fs) — %d finding(s)", scanner.name, elapsed, len(result.findings))
+            log.info(
+                "[%s] finished OK (%.1fs) — %d finding(s)",
+                scanner.name,
+                elapsed,
+                len(result.findings),
+            )
 
         status = f"error: {result.error}" if result.error is not None else "done"
         self._report_progress(scanner.display_name, status)
@@ -78,19 +98,23 @@ class ScanRunner:
         config: ScanConfig,
     ) -> ScanReport:
         scanner_names = [s.name for s in scanners]
-        log.info("scan started — target=%s scanners=%s timeout=%ss", target, scanner_names, config.timeout)
-        scan_start = datetime.now(timezone.utc)
+        log.info(
+            "scan started — target=%s scanners=%s timeout=%ss",
+            target,
+            scanner_names,
+            config.timeout,
+        )
+        scan_start = datetime.now(UTC)
         results: list[ScanResult] = []
 
         async with asyncio.TaskGroup() as tg:
             tasks = [
-                tg.create_task(self._run_scanner(s, target, config))
-                for s in scanners
+                tg.create_task(self._run_scanner(s, target, config)) for s in scanners
             ]
 
         results = [t.result() for t in tasks]
 
-        scan_end = datetime.now(timezone.utc)
+        scan_end = datetime.now(UTC)
         all_findings: list[Finding] = []
         for r in results:
             all_findings.extend(r.findings)
@@ -104,7 +128,9 @@ class ScanRunner:
         duration = (scan_end - scan_start).total_seconds()
         log.info(
             "scan complete — target=%s grade=%s duration=%.1fs findings=%s errors=%d",
-            target, grade, duration,
+            target,
+            grade,
+            duration,
             {s.value: c for s, c in summary.items() if c},
             len(errors),
         )
