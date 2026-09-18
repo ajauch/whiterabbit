@@ -41,13 +41,15 @@ def _cache_is_fresh() -> bool:
     return age < DB_MAX_AGE_SECONDS
 
 
-async def _fetch_vuln_db(client: httpx.AsyncClient) -> dict[str, Any]:
+async def _fetch_vuln_db() -> dict[str, Any]:
     if _cache_is_fresh():
         return json.loads(DB_CACHE_FILE.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
 
-    response = await client.get(RETIREJS_DB_URL, timeout=30)
-    response.raise_for_status()
-    db = response.json()
+    # Verify the database host's certificate independently of scan-target TLS.
+    async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
+        response = await client.get(RETIREJS_DB_URL)
+        response.raise_for_status()
+        db = response.json()
 
     DB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     DB_CACHE_FILE.write_text(json.dumps(db), encoding="utf-8")
@@ -218,15 +220,14 @@ class RetireJSScanner(BaseScanner):
         findings: list[Finding] = []
 
         try:
+            vuln_db = await _fetch_vuln_db()
+
             # verify=False: needed to scan targets with misconfigured TLS.
-            # Also used for the vuln DB fetch from GitHub — see note in README.
             async with httpx.AsyncClient(
                 follow_redirects=True,
                 timeout=httpx.Timeout(config.timeout),
                 verify=False,
             ) as client:
-                vuln_db = await _fetch_vuln_db(client)
-
                 response = await client.get(url)
                 html = response.text
                 script_urls = _extract_script_urls(html, str(response.url))
