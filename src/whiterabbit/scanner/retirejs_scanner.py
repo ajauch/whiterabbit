@@ -198,6 +198,8 @@ class RetireJSScanner(BaseScanner):
         findings: list[Finding] = []
 
         try:
+            # verify=False: needed to scan targets with misconfigured TLS.
+            # Also used for the vuln DB fetch from GitHub — see note in README.
             async with httpx.AsyncClient(
                 follow_redirects=True,
                 timeout=httpx.Timeout(config.timeout),

@@ -179,7 +179,9 @@ def _parse_testssl_finding(entry: dict) -> Finding | None:
     )
 
 
-_WINDOWS_TESTSSL_PATH = "C:/Tools/testssl/testssl.sh"
+_WINDOWS_TESTSSL_PATH = os.environ.get(
+    "WHITERABBIT_TESTSSL_PATH", "C:/Tools/testssl/testssl.sh"
+)
 
 _GIT_BASH_LOCATIONS = [
     r"C:\Program Files\Git\bin\bash.exe",
@@ -223,7 +225,7 @@ class TestSSLScanner(BaseScanner):
     def check_dependencies(self) -> list[str]:
         missing: list[str] = []
         if _find_testssl() is None:
-            missing.append("  'testssl.sh' not found on PATH or in C:\\Tools\\testssl")
+            missing.append(f"  'testssl.sh' not found on PATH (or set WHITERABBIT_TESTSSL_PATH)")
         elif sys.platform == "win32" and not shutil.which("testssl.sh") and not _find_git_bash():
             missing.append("  Git Bash required to run testssl.sh on Windows")
         return missing

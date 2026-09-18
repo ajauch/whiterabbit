@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
+from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,6 +17,20 @@ from whiterabbit.scanner.testssl_scanner import (
     _is_duplicate_of_ssl_scanner,
     _parse_testssl_finding,
 )
+
+
+def _force_direct_path(stack: ExitStack) -> None:
+    """Force the non-Windows (stdout-based) code path regardless of platform."""
+    if sys.platform == "win32":
+        stack.enter_context(
+            patch("whiterabbit.scanner.testssl_scanner._find_testssl", return_value="/usr/bin/testssl.sh")
+        )
+        stack.enter_context(
+            patch("whiterabbit.scanner.testssl_scanner.shutil.which", return_value="/usr/bin/testssl.sh")
+        )
+        stack.enter_context(
+            patch("whiterabbit.scanner.testssl_scanner.sys.platform", "linux")
+        )
 
 
 class TestIsDuplicateOfSSLScanner:
@@ -172,7 +188,11 @@ class TestTestSSLScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 0
 
-        with patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock):
+        with ExitStack() as stack:
+            _force_direct_path(stack)
+            stack.enter_context(
+                patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock)
+            )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -216,7 +236,11 @@ class TestTestSSLScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 0
 
-        with patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock):
+        with ExitStack() as stack:
+            _force_direct_path(stack)
+            stack.enter_context(
+                patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock)
+            )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -286,7 +310,11 @@ class TestTestSSLScanner:
         proc_mock.communicate = mock_communicate
         proc_mock.returncode = 0
 
-        with patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock):
+        with ExitStack() as stack:
+            _force_direct_path(stack)
+            stack.enter_context(
+                patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", return_value=proc_mock)
+            )
             scanner = TestSSLScanner()
             result = asyncio.run(scanner.scan("example.com", ScanConfig()))
 
@@ -309,12 +337,16 @@ class TestTestSSLScanner:
             calls.append(args)
             return proc_mock
 
-        with patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", side_effect=capture_exec):
+        with ExitStack() as stack:
+            _force_direct_path(stack)
+            stack.enter_context(
+                patch("whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec", side_effect=capture_exec)
+            )
             scanner = TestSSLScanner()
             asyncio.run(scanner.scan("example.com", ScanConfig()))
 
-        cmd_args = calls[0]
-        assert "https://example.com" in cmd_args
+        cmd_str = " ".join(calls[0])
+        assert "https://example.com" in cmd_str
 
     def test_empty_output_no_error(self) -> None:
         async def mock_communicate() -> tuple[bytes, bytes]:
