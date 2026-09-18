@@ -154,7 +154,9 @@ class TestTestSSLScanner:
         scanner = TestSSLScanner()
         assert scanner.name == "testssl"
         assert scanner.display_name == "Deep TLS Scanner"
-        assert "testssl.sh" in scanner.required_binaries
+        assert scanner.required_binaries == []
+        assert hasattr(scanner, "is_available")
+        assert hasattr(scanner, "check_dependencies")
 
     def test_successful_scan_with_findings(self) -> None:
         output = json.dumps([

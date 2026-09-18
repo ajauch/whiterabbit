@@ -284,13 +284,13 @@ class TestSSLScanner(BaseScanner):
                 url,
             ]
 
+        testssl_timeout = self.effective_timeout(config) + 30
         try:
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            testssl_timeout = self.effective_timeout(config) + 30
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(),
                 timeout=testssl_timeout,

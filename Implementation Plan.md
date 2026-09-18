@@ -233,7 +233,7 @@ from sslyze import Scanner, ServerScanRequest, ScanCommand
 - [x] Full unit tests with mocked SSLyze responses (24 tests)
 - [ ] Integration tests against badssl.com
 - [x] Remediation text for each finding
-- [x] End-to-end test: `whiterabbit scan fictivize.com --scanners ssl`
+- [x] End-to-end test: `whiterabbit scan example.com --scanners ssl`
 
 ---
 
@@ -289,7 +289,7 @@ Use **humble** (pure Python, actively maintained) or implement custom checks wit
 - [x] CORS misconfiguration checks
 - [x] HTTP-to-HTTPS redirect check
 - [x] Full unit and integration tests (40 tests)
-- [x] End-to-end: `whiterabbit scan fictivize.com --scanners headers`
+- [x] End-to-end: `whiterabbit scan example.com --scanners headers`
 
 ---
 
