@@ -19,6 +19,10 @@ The security fundamentals — transport encryption, header hardening, dependency
 hygiene — are exactly the things that slip through when speed is the priority.
 WhiteRabbit exists to catch those gaps post-deployment, before an attacker does.
 
+WhiteRabbit was itself built with Claude Code — the `CLAUDE.md` in this repo is
+the real file used during development, not a demo. A scanner for agent-written
+code that was agent-written is the honest version of eating your own dogfood.
+
 ## Installation
 
 ```bash
