@@ -22,3 +22,6 @@ build/
 
 # Claude Code local settings
 .claude/settings.local.json
+
+# Planning docs (not part of the project)
+Implementation Plan.md
