@@ -2,16 +2,21 @@
 
 [![CI](https://github.com/ajauch/whiterabbit/actions/workflows/ci.yml/badge.svg)](https://github.com/ajauch/whiterabbit/actions/workflows/ci.yml)
 
-**Grade the security posture of a deployed web application — in one command.**
+**Grade the security posture of a web application — deployed or in source — in one command.**
 
 Agent-written code ships fast, but it ships with a predictable set of security
 gaps: missing headers, outdated JavaScript libraries, TLS misconfigurations,
-exposed admin panels. WhiteRabbit runs best-in-class scanners against a live
-target and distills the results into a single letter grade (A+ through F) with
-actionable remediation for every finding.
+exposed admin panels, vulnerable dependencies, OWASP Top 10 code flaws.
+WhiteRabbit runs best-in-class scanners against a live target *or* a source
+repository and distills the results into a single letter grade (A+ through F)
+with actionable remediation for every finding.
 
 ```bash
+# Scan a live web target
 whiterabbit scan example.com
+
+# Scan a GitHub repo for dependency CVEs and OWASP issues
+whiterabbit scanrepo https://github.com/owner/repo
 ```
 
 ## Why this exists
@@ -33,12 +38,13 @@ pip install -e ".[dev]"
 
 ### External dependencies
 
-Most scanners are pure Python. Two require external binaries:
+Most scanners are pure Python. Three require external binaries:
 
 | Binary | Required by | Install |
 |--------|-------------|---------|
-| [Nuclei](https://github.com/projectdiscovery/nuclei#install-nuclei) | `nuclei` scanner | `go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest` |
-| [testssl.sh](https://github.com/drwetter/testssl.sh#install) | `testssl` scanner | Clone the repo or install via package manager |
+| [Nuclei](https://github.com/projectdiscovery/nuclei#install-nuclei) | `nuclei` web scanner | `go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest` |
+| [testssl.sh](https://github.com/drwetter/testssl.sh#install) | `testssl` web scanner | Clone the repo or install via package manager |
+| [Semgrep](https://semgrep.dev/docs/getting-started/) | `owasp` repo scanner | `pip install semgrep` or `brew install semgrep` |
 
 **testssl.sh on Windows:** WhiteRabbit invokes testssl.sh through Git Bash. It
 searches PATH first, then falls back to the path in the `WHITERABBIT_TESTSSL_PATH`
@@ -50,6 +56,8 @@ set WHITERABBIT_TESTSSL_PATH=D:/path/to/testssl.sh
 ```
 
 ## Usage
+
+### Web scanning
 
 ```bash
 # Scan a target (runs all available scanners)
@@ -83,6 +91,38 @@ whiterabbit list-scanners
 whiterabbit check-deps
 ```
 
+### Repository scanning
+
+```bash
+# Scan a GitHub repo (clones, scans, cleans up)
+whiterabbit scanrepo https://github.com/owner/repo
+
+# Scan a local directory
+whiterabbit scanrepo ./my-project
+
+# Specific branch
+whiterabbit scanrepo https://github.com/owner/repo --branch dev
+
+# Run only the CVE scanner
+whiterabbit scanrepo ./my-project --scanners cve
+
+# Full clone (default is shallow, depth=1)
+whiterabbit scanrepo https://github.com/owner/repo --depth 0
+
+# Keep the cloned repo after scanning
+whiterabbit scanrepo https://github.com/owner/repo --keep-clone
+
+# Output to HTML or JSON
+whiterabbit scanrepo ./my-project -o report.html
+whiterabbit scanrepo ./my-project --format json -o report.json
+
+# List available repo scanners
+whiterabbit list-repo-scanners
+
+# Check repo scanner dependencies
+whiterabbit check-repo-deps
+```
+
 ## Grading
 
 | Grade | Criteria |
@@ -96,6 +136,8 @@ whiterabbit check-deps
 
 ## Available scanners
 
+### Web scanners (`whiterabbit scan`)
+
 | Scanner | What it checks | Dependencies |
 |---------|---------------|--------------|
 | `ssl` | Certificate validation, protocol support, cipher suites, Heartbleed, ROBOT | None (SSLyze, pure Python) |
@@ -104,30 +146,49 @@ whiterabbit check-deps
 | `retirejs` | Known-vulnerable JavaScript libraries against the retire.js database | None (pure Python) |
 | `testssl` | Deep TLS/SSL analysis: BEAST, POODLE, DROWN, FREAK, Logjam, SWEET32, Ticketbleed | [testssl.sh](https://github.com/drwetter/testssl.sh#install) |
 
+### Repo scanners (`whiterabbit scanrepo`)
+
+| Scanner | What it checks | Dependencies |
+|---------|---------------|--------------|
+| `cve` | Known vulnerabilities in project dependencies via the [OSV.dev](https://osv.dev/) API. Parses `requirements.txt`, `pyproject.toml`, `package.json`, and `package-lock.json`. | None (pure Python) |
+| `owasp` | OWASP Top 10 code vulnerabilities via static analysis with the [Semgrep](https://semgrep.dev/) `p/owasp-top-ten` ruleset | [Semgrep](https://semgrep.dev/docs/getting-started/) |
+
 ## Architecture
 
-Scanners run concurrently via `asyncio.TaskGroup` with per-scanner timeouts.
-Every scanner is contractually forbidden from raising — it catches its own
-exceptions and returns a `ScanResult` with `error` set. This means a single
-broken or timed-out scanner never takes down the run or corrupts other results.
+Both pipelines share the same pattern: scanners run concurrently via
+`asyncio.TaskGroup` with per-scanner timeouts. Every scanner is contractually
+forbidden from raising — it catches its own exceptions and returns a `ScanResult`
+with `error` set. This means a single broken or timed-out scanner never takes
+down the run or corrupts other results.
 
 ```
 CLI (cli.py)
- └─ ScanRunner (runner.py)
-     └─ asyncio.TaskGroup
-         ├─ SSLScanner        → ScanResult
-         ├─ HeaderScanner     → ScanResult
-         ├─ NucleiScanner     → ScanResult
-         ├─ RetireJSScanner   → ScanResult
-         └─ TestSSLScanner    → ScanResult
-                 │
-                 ▼
-         ScanReport (aggregated findings + letter grade)
+ ├─ scan command
+ │   └─ ScanRunner (runner.py)
+ │       └─ asyncio.TaskGroup
+ │           ├─ SSLScanner        → ScanResult
+ │           ├─ HeaderScanner     → ScanResult
+ │           ├─ NucleiScanner     → ScanResult
+ │           ├─ RetireJSScanner   → ScanResult
+ │           └─ TestSSLScanner    → ScanResult
+ │
+ └─ scanrepo command
+     ├─ clone_repo() (temp dir, auto-cleanup)
+     └─ RepoScanRunner (repo_runner.py)
+         └─ asyncio.TaskGroup
+             ├─ CVEScanner        → ScanResult
+             └─ OWASPScanner      → ScanResult
+                     │
+                     ▼
+             ScanReport (aggregated findings + letter grade)
 ```
 
-This pattern — concurrent fan-out with fault isolation per task — is the most
-reusable idea in the codebase. Each scanner is a single class implementing
-`async scan(target, config) -> ScanResult`.
+Each scanner is a single class implementing `async scan(target, config) -> ScanResult`.
+Repo scanners follow the same contract but take a local directory path instead
+of a URL, and use `RepoScanConfig` instead of `ScanConfig`.
+
+For remote repos, `scanrepo` clones into a temporary directory (shallow by
+default) and cleans up automatically after the scan completes.
 
 ### Nuclei template selection
 
@@ -153,14 +214,18 @@ enabled to download its vulnerability database from GitHub
 
 ## Responsible use
 
-Only scan targets you own or have explicit permission to test. WhiteRabbit
-sends real HTTP requests and invokes external tools against the target — it is
-not a static analyzer. Unauthorized scanning may violate laws and terms of
-service.
+**Web scanning** sends real HTTP requests and invokes external tools against the
+target. Only scan targets you own or have explicit permission to test.
+Unauthorized scanning may violate laws and terms of service.
+
+**Repository scanning** is offline static analysis — it reads local files and
+queries public vulnerability databases. No traffic is sent to the scanned
+application. You still need appropriate access rights to the source code.
 
 ## Adding a scanner
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on adding new scanners.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on adding new web
+scanners or repo scanners.
 
 ## License
 

@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Repository scanning via `whiterabbit scanrepo` — scan GitHub repos or local
+  directories for security vulnerabilities.
+- Dependency CVE scanner (`cve`) — parses `requirements.txt`, `pyproject.toml`,
+  `package.json`, and `package-lock.json`, then queries the OSV.dev API for
+  known vulnerabilities. Pure Python, no external dependencies.
+- OWASP SAST scanner (`owasp`) — static analysis for OWASP Top 10
+  vulnerabilities using Semgrep's `p/owasp-top-ten` ruleset.
+- `list-repo-scanners` and `check-repo-deps` CLI commands.
+- Automatic git clone with temp directory cleanup for remote repo URLs.
+- `--branch`, `--depth`, and `--keep-clone` options for `scanrepo`.
+- Recursive manifest discovery — finds dependency files in subdirectories,
+  skipping `node_modules`, `.git`, `__pycache__`, `.venv`, and `vendor`.
+- Scan results appended to `RepoScanResults.csv` (separate from web scan CSV).
+
 ### Fixed
 
 - Verify TLS certificates when downloading the retire.js vulnerability database,
