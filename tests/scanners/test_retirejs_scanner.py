@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import time
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
+import pytest
 
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import Severity
+from whiterabbit.scanner import retirejs_scanner
 from whiterabbit.scanner.retirejs_scanner import (
     RetireJSScanner,
     _check_vulnerabilities,
@@ -18,6 +23,15 @@ from whiterabbit.scanner.retirejs_scanner import (
     _extract_version_from_filename,
     _version_in_range,
 )
+
+
+@pytest.fixture(autouse=True)
+def db_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    cache_dir = tmp_path / "cache"
+    cache_file = cache_dir / "jsrepository.json"
+    monkeypatch.setattr(retirejs_scanner, "DB_CACHE_DIR", cache_dir)
+    monkeypatch.setattr(retirejs_scanner, "DB_CACHE_FILE", cache_file)
+    return cache_file
 
 
 class TestExtractScriptUrls:
@@ -215,6 +229,99 @@ MOCK_VULN_DB = {
 
 
 class TestRetireJSScanner:
+    @pytest.mark.parametrize("cache_state", ["missing", "stale", "fresh"])
+    def test_database_and_target_tls_verification(
+        self,
+        cache_state: str,
+        db_cache: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        if cache_state != "missing":
+            db_cache.parent.mkdir()
+            db_cache.write_text(json.dumps(MOCK_VULN_DB), encoding="utf-8")
+            if cache_state == "stale":
+                expired = time.time() - retirejs_scanner.DB_MAX_AGE_SECONDS - 60
+                os.utime(db_cache, (expired, expired))
+
+        requests: list[tuple[str, bool]] = []
+        real_client = httpx.AsyncClient
+
+        def mock_client(**kwargs):
+            verify = kwargs.get("verify", True)
+
+            def handle(request: httpx.Request) -> httpx.Response:
+                url = str(request.url)
+                requests.append((url, verify))
+                if url == retirejs_scanner.RETIREJS_DB_URL:
+                    return httpx.Response(200, json=MOCK_VULN_DB)
+                assert url == "https://example.com"
+                return httpx.Response(
+                    200, text='<script src="/jquery-3.4.1.min.js"></script>'
+                )
+
+            return real_client(**kwargs, transport=httpx.MockTransport(handle))
+
+        monkeypatch.setattr(retirejs_scanner.httpx, "AsyncClient", mock_client)
+        result = asyncio.run(RetireJSScanner().scan("example.com", ScanConfig()))
+
+        assert result.error is None
+        assert any(f.cve == "CVE-2020-11022" for f in result.findings)
+        expected_requests = []
+        if cache_state != "fresh":
+            expected_requests.append((retirejs_scanner.RETIREJS_DB_URL, True))
+        expected_requests.append(("https://example.com", False))
+        assert requests == expected_requests
+        assert json.loads(db_cache.read_text(encoding="utf-8")) == MOCK_VULN_DB
+
+    @pytest.mark.parametrize("stale_cache", [False, True])
+    def test_database_tls_error_stops_scan_without_unverified_retry(
+        self,
+        stale_cache: bool,
+        db_cache: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        if stale_cache:
+            db_cache.parent.mkdir()
+            db_cache.write_text(json.dumps(MOCK_VULN_DB), encoding="utf-8")
+            expired = time.time() - retirejs_scanner.DB_MAX_AGE_SECONDS - 60
+            os.utime(db_cache, (expired, expired))
+            cached_mtime = db_cache.stat().st_mtime
+
+        requests: list[tuple[str, bool]] = []
+        real_client = httpx.AsyncClient
+
+        def mock_client(**kwargs):
+            verify = kwargs.get("verify", True)
+
+            def handle(request: httpx.Request) -> httpx.Response:
+                url = str(request.url)
+                requests.append((url, verify))
+                if url == retirejs_scanner.RETIREJS_DB_URL:
+                    if verify:
+                        raise httpx.ConnectError(
+                            "[SSL: CERTIFICATE_VERIFY_FAILED]", request=request
+                        )
+                    return httpx.Response(200, json={})
+                return httpx.Response(200, text="<html></html>")
+
+            return real_client(**kwargs, transport=httpx.MockTransport(handle))
+
+        monkeypatch.setattr(retirejs_scanner.httpx, "AsyncClient", mock_client)
+        result = asyncio.run(RetireJSScanner().scan("example.com", ScanConfig()))
+
+        assert result.error is not None
+        assert "retire.js vulnerability database" in result.error
+        assert retirejs_scanner.RETIREJS_DB_URL in result.error
+        assert "CERTIFICATE_VERIFY_FAILED" in result.error
+        assert "example.com" not in result.error
+        assert not result.findings
+        assert requests == [(retirejs_scanner.RETIREJS_DB_URL, True)]
+        if stale_cache:
+            assert json.loads(db_cache.read_text(encoding="utf-8")) == MOCK_VULN_DB
+            assert db_cache.stat().st_mtime == cached_mtime
+        else:
+            assert not db_cache.exists()
+
     def test_scanner_attributes(self) -> None:
         scanner = RetireJSScanner()
         assert scanner.name == "retirejs"
@@ -301,28 +408,75 @@ class TestRetireJSScanner:
         assert result.error is None
         assert len(result.findings) == 0
 
-    def test_timeout_error(self) -> None:
+    @pytest.mark.parametrize("failure", ["timeout", "http_status"])
+    def test_database_download_error_reports_database(
+        self, failure: str, db_cache: Path
+    ) -> None:
+        request = httpx.Request("GET", retirejs_scanner.RETIREJS_DB_URL)
         with patch(
             "whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient"
         ) as mock_client_cls:
             client_instance = AsyncMock()
-            client_instance.get = AsyncMock(
-                side_effect=httpx.TimeoutException("timeout")
+            if failure == "timeout":
+                client_instance.get.side_effect = httpx.ReadTimeout(
+                    "timeout", request=request
+                )
+            else:
+                client_instance.get.return_value = httpx.Response(503, request=request)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(
+                return_value=client_instance
             )
+            mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            result = asyncio.run(
+                RetireJSScanner().scan("example.com", ScanConfig(timeout=7))
+            )
+
+        assert result.error is not None
+        assert "retire.js vulnerability database" in result.error
+        assert retirejs_scanner.RETIREJS_DB_URL in result.error
+        assert "example.com" not in result.error
+        if failure == "timeout":
+            assert "timed out after 30s" in result.error
+            assert mock_client_cls.call_args.kwargs["timeout"] == 30
+        else:
+            assert "503" in result.error
+        assert not result.findings
+        assert not db_cache.exists()
+        mock_client_cls.assert_called_once()
+        client_instance.get.assert_awaited_once_with(retirejs_scanner.RETIREJS_DB_URL)
+
+    @pytest.mark.parametrize(
+        ("error", "expected"),
+        [
+            (httpx.TimeoutException("timeout"), "Request timed out after 7s"),
+            (
+                httpx.ConnectError("connection failed"),
+                "Could not connect to example.com",
+            ),
+        ],
+    )
+    def test_target_request_error(self, error: httpx.HTTPError, expected: str) -> None:
+        with patch(
+            "whiterabbit.scanner.retirejs_scanner.httpx.AsyncClient"
+        ) as mock_client_cls:
+            client_instance = AsyncMock()
+            client_instance.get = AsyncMock(side_effect=error)
             mock_client_cls.return_value.__aenter__ = AsyncMock(
                 return_value=client_instance
             )
             mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             with patch(
-                "whiterabbit.scanner.retirejs_scanner._cache_is_fresh",
-                return_value=False,
+                "whiterabbit.scanner.retirejs_scanner._fetch_vuln_db",
+                new_callable=AsyncMock,
+                return_value={},
             ):
                 scanner = RetireJSScanner()
-                result = asyncio.run(scanner.scan("example.com", ScanConfig()))
+                result = asyncio.run(scanner.scan("example.com", ScanConfig(timeout=7)))
 
-        assert result.error is not None
-        assert "timed out" in result.error
+        assert result.error == expected
+        client_instance.get.assert_awaited_once_with("https://example.com")
 
     def test_general_exception(self) -> None:
         with patch(

@@ -143,13 +143,13 @@ for your environment.
 ### TLS certificate verification
 
 The header scanner and retire.js scanner disable TLS certificate verification
-(`verify=False`) on outbound requests. This is intentional for target-probing
-requests: a security scanner that refuses to connect to misconfigured hosts
+(`verify=False`) on target-probing requests. This is intentional:
+a security scanner that refuses to connect to misconfigured hosts
 cannot assess misconfigured hosts.
 
-The retire.js scanner also uses the same unverified client to download its
-vulnerability database from GitHub (`raw.githubusercontent.com`). The DB fetch
-should use a verified connection — see [#7](https://github.com/ajauch/whiterabbit/issues/7).
+The retire.js scanner uses a separate client with TLS certificate verification
+enabled to download its vulnerability database from GitHub
+(`raw.githubusercontent.com`).
 
 ## Responsible use
 
