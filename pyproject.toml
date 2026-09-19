@@ -70,6 +70,9 @@ src = ["src", "tests"]
 select = ["E", "F", "I", "N", "UP", "B", "SIM", "RUF"]
 ignore = ["E501"]  # line length is enforced by ruff format; E501 flags unbreakable strings
 
+[tool.ruff.lint.per-file-ignores]
+"src/whiterabbit/scanner/ssl_scanner.py" = ["E402"]
+
 [tool.mypy]
 python_version = "3.11"
 strict = true
