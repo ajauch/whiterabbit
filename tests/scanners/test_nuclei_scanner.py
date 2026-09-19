@@ -18,8 +18,12 @@ from whiterabbit.scanner.nuclei_scanner import (
 
 class TestBuildCommand:
     def test_basic_command(self) -> None:
-        cmd = _build_command("https://example.com", ["exposure", "misconfig"], 300)
-        assert cmd[0] == "nuclei"
+        with patch(
+            "whiterabbit.scanner.nuclei_scanner.resolve_binary",
+            return_value="/usr/bin/nuclei",
+        ):
+            cmd = _build_command("https://example.com", ["exposure", "misconfig"], 300)
+        assert cmd[0] == "/usr/bin/nuclei"
         assert "-u" in cmd
         assert cmd[cmd.index("-u") + 1] == "https://example.com"
         assert "-jsonl" in cmd

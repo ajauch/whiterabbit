@@ -9,6 +9,7 @@ from typing import ClassVar
 
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.resolve import resolve_binary, subprocess_env
 from whiterabbit.scanner.base import BaseScanner
 
 EXCLUDED_TAGS = frozenset(
@@ -44,7 +45,7 @@ def _normalize_target(target: str) -> str:
 
 def _build_command(target: str, tags: list[str], timeout: int) -> list[str]:
     cmd = [
-        "nuclei",
+        resolve_binary("nuclei") or "nuclei",
         "-u",
         target,
         "-jsonl",
@@ -145,6 +146,7 @@ class NucleiScanner(BaseScanner):
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=subprocess_env(),
             )
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(),
