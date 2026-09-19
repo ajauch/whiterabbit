@@ -19,6 +19,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
-      - run: pytest tests/ -v -m "not integration"
+      - run: pytest tests/ -v -m "not integration" --cov=whiterabbit --cov-report=term-missing --cov-fail-under=80
       - run: ruff check src/ tests/
+      - run: ruff format --check src/ tests/
       - run: mypy src/
