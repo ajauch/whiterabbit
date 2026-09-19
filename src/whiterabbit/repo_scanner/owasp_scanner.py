@@ -11,6 +11,7 @@ from typing import ClassVar
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
 from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.resolve import resolve_binary, subprocess_env
 
 log = logging.getLogger("whiterabbit")
 
@@ -25,7 +26,7 @@ DEFAULT_CONFIG = "p/owasp-top-ten"
 
 def _build_command(repo_path: str, timeout: int) -> list[str]:
     return [
-        "semgrep",
+        resolve_binary("semgrep") or "semgrep",
         "--config",
         DEFAULT_CONFIG,
         "--json",
@@ -122,6 +123,7 @@ class OWASPScanner(BaseRepoScanner):
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                env=subprocess_env(),
             )
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(),

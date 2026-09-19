@@ -17,8 +17,12 @@ from whiterabbit.report.models import Severity
 
 class TestBuildCommand:
     def test_default_command(self) -> None:
-        cmd = _build_command("/tmp/repo", 300)
-        assert cmd[0] == "semgrep"
+        with patch(
+            "whiterabbit.repo_scanner.owasp_scanner.resolve_binary",
+            return_value="/usr/bin/semgrep",
+        ):
+            cmd = _build_command("/tmp/repo", 300)
+        assert cmd[0] == "/usr/bin/semgrep"
         assert "--config" in cmd
         assert "p/owasp-top-ten" in cmd
         assert "--json" in cmd
@@ -161,12 +165,15 @@ class TestParseSemgrepOutput:
 
 class TestOWASPScanner:
     def test_is_available_without_semgrep(self) -> None:
-        with patch("shutil.which", return_value=None):
+        with patch("whiterabbit.repo_scanner.base.resolve_binary", return_value=None):
             scanner = OWASPScanner()
             assert not scanner.is_available()
 
     def test_is_available_with_semgrep(self) -> None:
-        with patch("shutil.which", return_value="/usr/bin/semgrep"):
+        with patch(
+            "whiterabbit.repo_scanner.base.resolve_binary",
+            return_value="/usr/bin/semgrep",
+        ):
             scanner = OWASPScanner()
             assert scanner.is_available()
 

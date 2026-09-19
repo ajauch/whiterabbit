@@ -153,6 +153,35 @@ class TestDetectEcosystems:
         assert "PyPI" in result
         assert "npm" in result
 
+    def test_finds_manifests_in_subdirectories(self, tmp_path: Path) -> None:
+        backend = tmp_path / "backend"
+        backend.mkdir()
+        (backend / "requirements.txt").write_text("django==4.2.0\n")
+        frontend = tmp_path / "frontend"
+        frontend.mkdir()
+        (frontend / "package.json").write_text(
+            json.dumps({"dependencies": {"react": "^18.0.0"}})
+        )
+        result = _detect_ecosystems(str(tmp_path))
+        assert "PyPI" in result
+        assert ("django", "4.2.0") in result["PyPI"]
+        assert "npm" in result
+        assert ("react", "18.0.0") in result["npm"]
+
+    def test_skips_node_modules(self, tmp_path: Path) -> None:
+        nm = tmp_path / "node_modules" / "evil-pkg"
+        nm.mkdir(parents=True)
+        (nm / "package.json").write_text(
+            json.dumps({"dependencies": {"hidden": "^1.0.0"}})
+        )
+        (tmp_path / "package.json").write_text(
+            json.dumps({"dependencies": {"express": "^4.18.2"}})
+        )
+        result = _detect_ecosystems(str(tmp_path))
+        pkgs = [name for name, _ in result.get("npm", [])]
+        assert "express" in pkgs
+        assert "hidden" not in pkgs
+
 
 class TestCvssSeverity:
     def test_critical(self) -> None:

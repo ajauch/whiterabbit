@@ -11,7 +11,9 @@ build/
 /report.json
 /report.html
 /ScanResults.csv
+/RepoScanResults.csv
 /whiterabbit.log
+.coverage
 
 # Caches
 .whiterabbit/

@@ -14,6 +14,13 @@ workflow and the scanner-specific process.
    ```bash
    pip install -e ".[dev]"
    ```
+4. Install the pre-commit hooks:
+   ```bash
+   pre-commit install
+   ```
+
+This ensures every commit is automatically checked for lint, formatting, type
+errors, and test failures — the same checks CI runs.
 
 ## Making changes
 
@@ -24,11 +31,13 @@ workflow and the scanner-specific process.
 
 ## Running the checks
 
-All three must pass before a PR will be merged:
+The pre-commit hooks run these automatically on every commit. To run them
+manually:
 
 ```bash
 pytest tests/ -v -m "not integration"
 ruff check src/ tests/
+ruff format --check src/ tests/
 mypy src/
 ```
 
@@ -57,7 +66,7 @@ participating, you agree to uphold it.
 
 ---
 
-## Adding a new scanner
+## Adding a new web scanner
 
 WhiteRabbit is designed to make adding scanners straightforward. Here's how:
 
@@ -130,3 +139,77 @@ Create `tests/scanners/test_your_scanner.py` with:
 - **Set CWE/CVE** when applicable.
 - **Use `config.timeout`** — the runner enforces it, but be a good citizen.
 - **External binaries** go in `required_binaries` so `check-deps` reports them.
+
+---
+
+## Adding a new repo scanner
+
+Repo scanners follow the same pattern as web scanners but operate on a local
+directory (a cloned repo or existing project) instead of a live URL.
+
+### 1. Create the scanner file
+
+Create `src/whiterabbit/repo_scanner/your_scanner.py`:
+
+```python
+from __future__ import annotations
+from datetime import datetime, timezone
+from whiterabbit.config import RepoScanConfig
+from whiterabbit.repo_scanner.base import BaseRepoScanner
+from whiterabbit.report.models import Finding, ScanResult, Severity
+
+class YourScanner(BaseRepoScanner):
+    name = "your_scanner"              # Machine name, used in --scanners flag
+    display_name = "Your Scanner"      # Human-readable name
+    description = "What it checks"     # One-line description
+    required_binaries = []             # e.g. ["semgrep"] if it needs an external binary
+
+    async def scan(self, repo_path: str, config: RepoScanConfig) -> ScanResult:
+        started = datetime.now(timezone.utc)
+        findings: list[Finding] = []
+
+        try:
+            # Your scanning logic here — repo_path is a local directory
+            pass
+        except Exception as exc:
+            return ScanResult(
+                target=repo_path,
+                scanner_name=self.name,
+                started_at=started,
+                finished_at=datetime.now(timezone.utc),
+                error=str(exc),
+            )
+
+        return ScanResult(
+            target=repo_path,
+            scanner_name=self.name,
+            started_at=started,
+            finished_at=datetime.now(timezone.utc),
+            findings=findings,
+        )
+```
+
+### 2. Register it
+
+Add your scanner to `src/whiterabbit/repo_scanner/__init__.py`:
+
+```python
+from whiterabbit.repo_scanner.your_scanner import YourScanner
+
+REPO_SCANNER_REGISTRY: dict[str, type[BaseRepoScanner]] = {
+    # ... existing scanners ...
+    "your_scanner": YourScanner,
+}
+```
+
+### 3. Write tests
+
+Create `tests/repo_scanners/test_your_scanner.py` with:
+- Unit tests using mocked responses (no network calls, no real subprocess)
+- At least one end-to-end test (can be marked `@pytest.mark.integration`)
+
+### Key rules
+
+Same as web scanners, plus:
+- **`scan()` receives a local path**, not a URL. The clone/cleanup lifecycle is handled by the CLI.
+- **Use `RepoScanConfig`** instead of `ScanConfig` — it includes repo-specific options like `branch` and `depth`.

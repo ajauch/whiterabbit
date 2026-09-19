@@ -68,12 +68,15 @@ class _NoDepsScanner(BaseScanner):
 
 class TestBaseScanner:
     def test_is_available_when_binary_exists(self) -> None:
-        with patch("shutil.which", return_value="/usr/bin/some_binary"):
+        with patch(
+            "whiterabbit.scanner.base.resolve_binary",
+            return_value="/usr/bin/some_binary",
+        ):
             scanner = _StubScanner()
             assert scanner.is_available() is True
 
     def test_is_available_when_binary_missing(self) -> None:
-        with patch("shutil.which", return_value=None):
+        with patch("whiterabbit.scanner.base.resolve_binary", return_value=None):
             scanner = _StubScanner()
             assert scanner.is_available() is False
 
@@ -82,12 +85,15 @@ class TestBaseScanner:
         assert scanner.is_available() is True
 
     def test_check_dependencies_all_present(self) -> None:
-        with patch("shutil.which", return_value="/usr/bin/some_binary"):
+        with patch(
+            "whiterabbit.scanner.base.resolve_binary",
+            return_value="/usr/bin/some_binary",
+        ):
             scanner = _StubScanner()
             assert scanner.check_dependencies() == []
 
     def test_check_dependencies_missing(self) -> None:
-        with patch("shutil.which", return_value=None):
+        with patch("whiterabbit.scanner.base.resolve_binary", return_value=None):
             scanner = _StubScanner()
             missing = scanner.check_dependencies()
             assert len(missing) == 1
@@ -123,17 +129,20 @@ class _StubRepoScanner(BaseRepoScanner):
 
 class TestBaseRepoScanner:
     def test_is_available_when_binary_exists(self) -> None:
-        with patch("shutil.which", return_value="/usr/bin/semgrep"):
+        with patch(
+            "whiterabbit.repo_scanner.base.resolve_binary",
+            return_value="/usr/bin/semgrep",
+        ):
             scanner = _StubRepoScanner()
             assert scanner.is_available() is True
 
     def test_is_available_when_binary_missing(self) -> None:
-        with patch("shutil.which", return_value=None):
+        with patch("whiterabbit.repo_scanner.base.resolve_binary", return_value=None):
             scanner = _StubRepoScanner()
             assert scanner.is_available() is False
 
     def test_check_dependencies_missing(self) -> None:
-        with patch("shutil.which", return_value=None):
+        with patch("whiterabbit.repo_scanner.base.resolve_binary", return_value=None):
             scanner = _StubRepoScanner()
             missing = scanner.check_dependencies()
             assert len(missing) == 1

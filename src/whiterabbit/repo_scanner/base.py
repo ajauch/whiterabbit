@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-import shutil
 from abc import ABC, abstractmethod
 from typing import ClassVar
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.report.models import ScanResult
+from whiterabbit.resolve import resolve_binary
 
 
 class BaseRepoScanner(ABC):
@@ -26,11 +26,11 @@ class BaseRepoScanner(ABC):
         return config.timeout
 
     def is_available(self) -> bool:
-        return all(shutil.which(b) is not None for b in self.required_binaries)
+        return all(resolve_binary(b) is not None for b in self.required_binaries)
 
     def check_dependencies(self) -> list[str]:
         missing: list[str] = []
         for binary in self.required_binaries:
-            if shutil.which(binary) is None:
+            if resolve_binary(binary) is None:
                 missing.append(f"  {binary!r} not found on PATH")
         return missing

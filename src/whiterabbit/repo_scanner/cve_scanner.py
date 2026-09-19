@@ -117,13 +117,21 @@ MANIFEST_PARSERS: dict[str, tuple[str, object]] = {
 # ---------------------------------------------------------------------------
 
 
+_SKIP_DIRS = {"node_modules", ".git", "__pycache__", ".venv", "venv", "vendor", ".tox"}
+
+
 def _detect_ecosystems(repo_path: str) -> dict[str, list[tuple[str, str]]]:
-    """Walk the repo root for known manifests and parse them."""
-    root = Path(repo_path)
+    """Recursively find known manifests and parse them."""
+    import os
+
     results: dict[str, list[tuple[str, str]]] = {}
-    for filename, (ecosystem, parser) in MANIFEST_PARSERS.items():
-        manifest = root / filename
-        if manifest.is_file():
+    for dirpath, dirnames, filenames in os.walk(repo_path):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        for filename in filenames:
+            if filename not in MANIFEST_PARSERS:
+                continue
+            ecosystem, parser = MANIFEST_PARSERS[filename]
+            manifest = Path(dirpath) / filename
             parsed = parser(manifest)  # type: ignore[operator]
             if parsed:
                 results.setdefault(ecosystem, []).extend(parsed)
@@ -169,7 +177,7 @@ def _extract_cvss_score(vuln: dict[str, object]) -> float | None:
                     return float(part)
                 except ValueError:
                     continue
-        elif isinstance(score, (int, float)):
+        elif isinstance(score, int | float):
             return float(score)
     return None
 
