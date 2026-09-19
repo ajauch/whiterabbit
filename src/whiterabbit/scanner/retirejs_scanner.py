@@ -22,6 +22,7 @@ RETIREJS_DB_URL = "https://raw.githubusercontent.com/RetireJS/retire.js/master/r
 DB_CACHE_DIR = Path.home() / ".whiterabbit" / "cache"
 DB_CACHE_FILE = DB_CACHE_DIR / "jsrepository.json"
 DB_MAX_AGE_SECONDS = 30 * 24 * 3600
+DB_DOWNLOAD_TIMEOUT_SECONDS = 30
 
 SEVERITY_MAP: dict[str, Severity] = {
     "critical": Severity.CRITICAL,
@@ -46,10 +47,23 @@ async def _fetch_vuln_db() -> dict[str, Any]:
         return json.loads(DB_CACHE_FILE.read_text(encoding="utf-8"))  # type: ignore[no-any-return]
 
     # Verify the database host's certificate independently of scan-target TLS.
-    async with httpx.AsyncClient(follow_redirects=True, timeout=30) as client:
-        response = await client.get(RETIREJS_DB_URL)
-        response.raise_for_status()
-        db = response.json()
+    try:
+        async with httpx.AsyncClient(
+            follow_redirects=True, timeout=DB_DOWNLOAD_TIMEOUT_SECONDS
+        ) as client:
+            response = await client.get(RETIREJS_DB_URL)
+            response.raise_for_status()
+            db = response.json()
+    except httpx.TimeoutException as exc:
+        raise RuntimeError(
+            f"Download of the retire.js vulnerability database from {RETIREJS_DB_URL} "
+            f"timed out after {DB_DOWNLOAD_TIMEOUT_SECONDS}s"
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise RuntimeError(
+            f"Could not download the retire.js vulnerability database from {RETIREJS_DB_URL}: "
+            f"{str(exc) or type(exc).__name__}"
+        ) from exc
 
     DB_CACHE_DIR.mkdir(parents=True, exist_ok=True)
     DB_CACHE_FILE.write_text(json.dumps(db), encoding="utf-8")

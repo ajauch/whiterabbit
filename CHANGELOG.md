@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Verify TLS certificates when downloading the retire.js vulnerability database,
   while allowing scans of targets with misconfigured TLS.
+- Identify retire.js database download failures separately from target connection
+  errors, preserving the failure details and reporting the database timeout.
 
 ## [0.1.0] - 2026-09-17
 
