@@ -165,9 +165,7 @@ class TestParseSemgrepOutput:
 
 class TestOWASPScanner:
     def test_is_available_without_semgrep(self) -> None:
-        with patch(
-            "whiterabbit.repo_scanner.base.resolve_binary", return_value=None
-        ):
+        with patch("whiterabbit.repo_scanner.base.resolve_binary", return_value=None):
             scanner = OWASPScanner()
             assert not scanner.is_available()
 

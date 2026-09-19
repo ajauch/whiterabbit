@@ -14,7 +14,11 @@ def _python_scripts_dirs() -> list[Path]:
     scheme = "nt_user" if sys.platform == "win32" else "posix_user"
     for key in (scheme, None):
         try:
-            raw = sysconfig.get_path("scripts", key) if key else sysconfig.get_path("scripts")
+            raw = (
+                sysconfig.get_path("scripts", key)
+                if key
+                else sysconfig.get_path("scripts")
+            )
         except KeyError:
             continue
         if raw:
