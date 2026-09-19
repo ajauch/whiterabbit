@@ -14,6 +14,13 @@ workflow and the scanner-specific process.
    ```bash
    pip install -e ".[dev]"
    ```
+4. Install the pre-commit hooks:
+   ```bash
+   pre-commit install
+   ```
+
+This ensures every commit is automatically checked for lint, formatting, type
+errors, and test failures — the same checks CI runs.
 
 ## Making changes
 
@@ -24,11 +31,13 @@ workflow and the scanner-specific process.
 
 ## Running the checks
 
-All three must pass before a PR will be merged:
+The pre-commit hooks run these automatically on every commit. To run them
+manually:
 
 ```bash
 pytest tests/ -v -m "not integration"
 ruff check src/ tests/
+ruff format --check src/ tests/
 mypy src/
 ```
 

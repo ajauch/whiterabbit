@@ -177,7 +177,7 @@ def _extract_cvss_score(vuln: dict[str, object]) -> float | None:
                     return float(part)
                 except ValueError:
                     continue
-        elif isinstance(score, (int, float)):
+        elif isinstance(score, int | float):
             return float(score)
     return None
 
