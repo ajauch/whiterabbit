@@ -2,8 +2,18 @@
 
 from __future__ import annotations
 
+import warnings
 from datetime import UTC, datetime
 from urllib.parse import urlparse
+
+# SSLyze's bundled trust stores contain certs with non-positive serial numbers;
+# the cryptography library warns about these but they're not actionable.
+warnings.filterwarnings(
+    "ignore",
+    message="Parsed a serial number which wasn't positive",
+    category=DeprecationWarning,
+    module=r"sslyze\.plugins\.certificate_info\.trust_stores\.trust_store",
+)
 
 from sslyze import (  # type: ignore[attr-defined]
     CipherSuitesScanResult,
