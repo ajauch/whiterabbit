@@ -16,7 +16,11 @@ from rich.table import Table
 from rich.text import Text
 
 from whiterabbit import __version__
-from whiterabbit.config import ScanConfig
+from whiterabbit.config import RepoScanConfig, ScanConfig
+from whiterabbit.repo_runner import RepoScanRunner
+from whiterabbit.repo_scanner import get_all_repo_scanners
+from whiterabbit.repo_scanner.base import BaseRepoScanner
+from whiterabbit.repo_scanner.clone import clone_repo
 from whiterabbit.report.formatters.html import write_html
 from whiterabbit.report.formatters.json import format_json, write_json
 from whiterabbit.report.formatters.terminal import format_terminal
@@ -242,32 +246,7 @@ def scan(
             thread.join(timeout=0.12)
 
     assert report_result is not None
-    report = report_result
-    _append_csv(report)
-
-    if fmt == "json":
-        if output:
-            write_json(report, output)
-            console.print(f"JSON report written to {output}")
-        else:
-            console.print(format_json(report))
-    elif fmt == "html":
-        if output:
-            write_html(report, output)
-            console.print(f"HTML report written to {output}")
-        else:
-            console.print(
-                "[yellow]HTML format requires --output. Use --format terminal for console output.[/yellow]"
-            )
-    else:
-        format_terminal(report, console)
-        if output:
-            if output.endswith(".html"):
-                write_html(report, output)
-                console.print(f"\nHTML report written to {output}")
-            else:
-                write_json(report, output)
-                console.print(f"\nJSON report written to {output}")
+    _output_report(report_result, fmt, output)
 
 
 @app.command("list-scanners")
@@ -319,3 +298,263 @@ def check_deps() -> None:
 
     if all_good:
         console.print("\n[green]All scanner dependencies are installed.[/green]")
+
+
+# ---------------------------------------------------------------------------
+# Repo scanning commands
+# ---------------------------------------------------------------------------
+
+
+@app.command("scanrepo")
+def scanrepo(
+    target: Annotated[
+        str, typer.Argument(help="Git repo URL or local directory path.")
+    ],
+    branch: Annotated[
+        str | None, typer.Option("--branch", "-b", help="Branch to checkout.")
+    ] = None,
+    depth: Annotated[
+        int | None, typer.Option("--depth", help="Clone depth (default 1, 0 for full).")
+    ] = 1,
+    scanners: Annotated[
+        str | None, typer.Option("--scanners", help="Comma-separated scanner list.")
+    ] = None,
+    output: Annotated[
+        str | None,
+        typer.Option("--output", "-o", help="Write report to file (.json or .html)."),
+    ] = None,
+    fmt: Annotated[
+        str, typer.Option("--format", "-f", help="Output format: terminal, json, html.")
+    ] = "terminal",
+    timeout: Annotated[
+        int, typer.Option("--timeout", help="Per-scanner timeout in seconds.")
+    ] = 300,
+    no_color: Annotated[
+        bool, typer.Option("--no-color", help="Disable colored output.")
+    ] = False,
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Show detailed scanner output.")
+    ] = False,
+    keep_clone: Annotated[
+        bool, typer.Option("--keep-clone", help="Keep cloned repo after scan.")
+    ] = False,
+) -> None:
+    """Scan a GitHub repository for security vulnerabilities."""
+    _setup_logging(verbose)
+
+    if no_color:
+        console.no_color = True
+
+    is_local = Path(target).is_dir()
+
+    if not is_local:
+        import shutil
+
+        if not shutil.which("git"):
+            console.print("[red]git is not installed or not on PATH.[/red]")
+            raise typer.Exit(1)
+
+    config = RepoScanConfig(
+        timeout=timeout,
+        verbose=verbose,
+        format=fmt,
+        output=output,
+        scanners=scanners.split(",") if scanners else [],
+        branch=branch,
+        depth=depth if depth and depth > 0 else None,
+        keep_clone=keep_clone,
+    )
+
+    all_repo_scanners = get_all_repo_scanners()
+    selected: list[str] = []
+
+    if scanners:
+        selected = config.scanners
+        for name in selected:
+            if name not in all_repo_scanners:
+                console.print(f"[red]Unknown repo scanner: {name!r}[/red]")
+                available = ", ".join(sorted(all_repo_scanners)) or "(none)"
+                console.print(f"Available repo scanners: {available}")
+                raise typer.Exit(1)
+    else:
+        selected = list(all_repo_scanners)
+
+    scanner_instances = [all_repo_scanners[n]() for n in selected]
+
+    scan_log = logging.getLogger("whiterabbit")
+    unavailable = [s for s in scanner_instances if not s.is_available()]
+    for s in unavailable:
+        missing = s.check_dependencies()
+        scan_log.warning("scanner %s unavailable: %s", s.name, "; ".join(missing))
+        console.print(f"[yellow]Scanner {s.display_name} unavailable:[/yellow]")
+        for line in missing:
+            console.print(f"  {line}")
+    scanner_instances = [s for s in scanner_instances if s.is_available()]
+
+    if not scanner_instances:
+        scan_log.error("no repo scanners available")
+        console.print(
+            "[yellow]No repo scanners available. Running produces an empty report.[/yellow]"
+        )
+
+    display_target = target
+
+    if is_local:
+        repo_path = str(Path(target).resolve())
+        _run_repo_scan(
+            display_target, repo_path, scanner_instances, config, fmt, output
+        )
+    else:
+        console.print(f"[dim]Cloning {target}...[/dim]")
+
+        async def _clone_and_scan() -> ScanReport:
+            async with clone_repo(
+                target,
+                branch=config.branch,
+                depth=config.depth,
+                keep=config.keep_clone,
+            ) as repo_dir:
+                if config.keep_clone:
+                    console.print(f"[dim]Cloned to {repo_dir}[/dim]")
+                runner = RepoScanRunner()
+                return await runner.run(
+                    display_target, str(repo_dir), scanner_instances, config
+                )
+
+        report = asyncio.run(_clone_and_scan())
+        _output_report(report, fmt, output)
+
+
+def _run_repo_scan(
+    display_target: str,
+    repo_path: str,
+    scanner_instances: list[BaseRepoScanner],
+    config: RepoScanConfig,
+    fmt: str,
+    output: str | None,
+) -> None:
+    scanner_status: dict[str, str] = {
+        s.display_name: "pending" for s in scanner_instances
+    }
+    lock = threading.Lock()
+
+    def on_progress(scanner_name: str, status: str) -> None:
+        with lock:
+            scanner_status[scanner_name] = status
+
+    runner = RepoScanRunner(on_progress=on_progress)
+
+    report_result: ScanReport | None = None
+
+    def run_scan() -> None:
+        nonlocal report_result
+        report_result = asyncio.run(
+            runner.run(display_target, repo_path, scanner_instances, config)
+        )
+
+    with Live(
+        _build_progress_table(display_target, scanner_status),
+        console=console,
+        transient=True,
+        refresh_per_second=8,
+    ) as live:
+        thread = threading.Thread(target=run_scan)
+        thread.start()
+
+        while thread.is_alive():
+            with lock:
+                live.update(_build_progress_table(display_target, scanner_status))
+            thread.join(timeout=0.12)
+
+    assert report_result is not None
+    _output_report(report_result, fmt, output)
+
+
+def _output_report(report: ScanReport, fmt: str, output: str | None) -> None:
+    _append_csv(report)
+
+    if fmt == "json":
+        if output:
+            write_json(report, output)
+            console.print(f"JSON report written to {output}")
+        else:
+            console.print(format_json(report))
+    elif fmt == "html":
+        if output:
+            write_html(report, output)
+            console.print(f"HTML report written to {output}")
+        else:
+            console.print(
+                "[yellow]HTML format requires --output. "
+                "Use --format terminal for console output.[/yellow]"
+            )
+    else:
+        format_terminal(report, console)
+        if output:
+            if output.endswith(".html"):
+                write_html(report, output)
+                console.print(f"\nHTML report written to {output}")
+            else:
+                write_json(report, output)
+                console.print(f"\nJSON report written to {output}")
+
+
+@app.command("list-repo-scanners")
+def list_repo_scanners() -> None:
+    """List all available repo scanners."""
+    all_repo_scanners = get_all_repo_scanners()
+    if not all_repo_scanners:
+        console.print("[yellow]No repo scanners registered yet.[/yellow]")
+        return
+
+    table = Table(title="Available Repo Scanners", show_header=True)
+    table.add_column("Name", style="bold")
+    table.add_column("Description")
+    table.add_column("Status")
+
+    for name, cls in sorted(all_repo_scanners.items()):
+        instance = cls()
+        status = (
+            "[green]ready[/green]"
+            if instance.is_available()
+            else "[red]missing deps[/red]"
+        )
+        table.add_row(name, instance.description, status)
+
+    console.print(table)
+
+
+@app.command("check-repo-deps")
+def check_repo_deps() -> None:
+    """Check which repo scanner dependencies are installed."""
+    all_repo_scanners = get_all_repo_scanners()
+    if not all_repo_scanners:
+        console.print("[yellow]No repo scanners registered yet.[/yellow]")
+        return
+
+    import shutil
+
+    all_good = True
+
+    git_ok = shutil.which("git") is not None
+    if git_ok:
+        console.print("[green]git:[/green] installed")
+    else:
+        all_good = False
+        console.print("[red]git:[/red] not found on PATH")
+
+    for _name, cls in sorted(all_repo_scanners.items()):
+        instance = cls()
+        missing = instance.check_dependencies()
+        if missing:
+            all_good = False
+            console.print(f"[red]{instance.display_name}:[/red]")
+            for line in missing:
+                console.print(f"  {line}")
+        else:
+            console.print(
+                f"[green]{instance.display_name}:[/green] all dependencies installed"
+            )
+
+    if all_good:
+        console.print("\n[green]All repo scanner dependencies are installed.[/green]")

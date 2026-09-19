@@ -6,13 +6,18 @@ from datetime import UTC, datetime
 
 import pytest
 
-from whiterabbit.config import ScanConfig
+from whiterabbit.config import RepoScanConfig, ScanConfig
 from whiterabbit.report.models import Finding, ScanReport, ScanResult, Severity
 
 
 @pytest.fixture
 def sample_config() -> ScanConfig:
     return ScanConfig()
+
+
+@pytest.fixture
+def repo_sample_config() -> RepoScanConfig:
+    return RepoScanConfig()
 
 
 @pytest.fixture

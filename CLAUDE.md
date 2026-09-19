@@ -8,10 +8,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Install (editable, with dev deps)
 pip install -e ".[dev]"
 
-# Run the scanner
+# Run the web scanner
 whiterabbit scan <target>              # all scanners, terminal output
 whiterabbit scan <target> --quick      # headers + SSL only
 python -m whiterabbit scan <target>    # alternative entry point
+
+# Run the repo scanner
+whiterabbit scanrepo <repo-url>        # scan a GitHub repo (clones, scans, cleans up)
+whiterabbit scanrepo ./local-dir       # scan a local directory
+whiterabbit scanrepo <url> --branch dev --scanners cve  # specific branch + scanner
+whiterabbit list-repo-scanners         # show available repo scanners
+whiterabbit check-repo-deps            # check repo scanner dependencies
 
 # Tests
 pytest tests/ -v                       # all tests
@@ -40,6 +47,12 @@ WhiteRabbit is a local web security scanner. Src layout: `src/whiterabbit/`.
 **Grading** (`report/grader.py`): Waterfall — any critical→F, high→D, medium→C, low→B, info-only→A, none→A+.
 
 **HTML reports** use a Jinja2 template at `templates/report.html`.
+
+**Repo scan pipeline:** CLI `scanrepo` command auto-detects local directories vs git URLs. For URLs, it clones via `clone_repo()` (async context manager with temp dir cleanup). `RepoScanRunner` (`repo_runner.py`) orchestrates repo scanners concurrently — same TaskGroup/timeout/progress pattern as `ScanRunner`. Reuses all existing data models and formatters.
+
+**Repo scanner contract:** Repo scanners subclass `BaseRepoScanner` (`repo_scanner/base.py`). Same contract as `BaseScanner` but `scan()` takes `repo_path` (local dir) + `RepoScanConfig`. Registered in `REPO_SCANNER_REGISTRY` in `repo_scanner/__init__.py`.
+
+**Repo scanners:** `cve` (pure Python, parses dependency manifests and queries OSV.dev API), `owasp` (Semgrep subprocess, requires `semgrep` binary).
 
 ## Testing patterns
 

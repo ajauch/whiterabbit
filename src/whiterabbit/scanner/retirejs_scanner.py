@@ -81,7 +81,9 @@ def _extract_script_urls(html: str, base_url: str) -> list[str]:
     return urls
 
 
-def _extract_version_from_filename(filename: str, extractors: dict[str, Any]) -> str | None:
+def _extract_version_from_filename(
+    filename: str, extractors: dict[str, Any]
+) -> str | None:
     filename_patterns = extractors.get("filename")
     uri_patterns = extractors.get("uri")
 
@@ -101,7 +103,9 @@ def _extract_version_from_filename(filename: str, extractors: dict[str, Any]) ->
     return None
 
 
-def _extract_version_from_content(content: str, extractors: dict[str, Any]) -> str | None:
+def _extract_version_from_content(
+    content: str, extractors: dict[str, Any]
+) -> str | None:
     filecontent_patterns = extractors.get("filecontent")
     if not filecontent_patterns:
         return None
