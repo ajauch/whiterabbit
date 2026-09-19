@@ -210,17 +210,17 @@ class SSLScanner(BaseScanner):
             ) and not any(
                 f.title.startswith("Certificate is self-signed") for f in findings
             ):
-                    findings.append(
-                        Finding(
-                            severity=Severity.MEDIUM,
-                            title="Incomplete certificate chain",
-                            description="The server's certificate chain could not be validated against any trust store.",
-                            remediation="Ensure the server sends the full certificate chain including intermediate certificates.",
-                            category="ssl",
-                            scanner=self.name,
-                            cwe="CWE-295",
-                        )
+                findings.append(
+                    Finding(
+                        severity=Severity.MEDIUM,
+                        title="Incomplete certificate chain",
+                        description="The server's certificate chain could not be validated against any trust store.",
+                        remediation="Ensure the server sends the full certificate chain including intermediate certificates.",
+                        category="ssl",
+                        scanner=self.name,
+                        cwe="CWE-295",
                     )
+                )
 
             if deployment.verified_chain_has_legacy_symantec_anchor is not None:
                 pass

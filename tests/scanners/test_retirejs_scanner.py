@@ -248,7 +248,9 @@ class TestRetireJSScanner:
         ):
             client_instance = AsyncMock()
             client_instance.get = mock_get
-            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(
+                return_value=client_instance
+            )
             mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             scanner = RetireJSScanner()
@@ -288,7 +290,9 @@ class TestRetireJSScanner:
         ):
             client_instance = AsyncMock()
             client_instance.get = mock_get
-            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(
+                return_value=client_instance
+            )
             mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             scanner = RetireJSScanner()
@@ -305,7 +309,9 @@ class TestRetireJSScanner:
             client_instance.get = AsyncMock(
                 side_effect=httpx.TimeoutException("timeout")
             )
-            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(
+                return_value=client_instance
+            )
             mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             with patch(
@@ -324,7 +330,9 @@ class TestRetireJSScanner:
         ) as mock_client_cls:
             client_instance = AsyncMock()
             client_instance.get = AsyncMock(side_effect=RuntimeError("network error"))
-            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(
+                return_value=client_instance
+            )
             mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             with patch(
@@ -362,7 +370,9 @@ class TestRetireJSScanner:
         ):
             client_instance = AsyncMock()
             client_instance.get = mock_get
-            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(
+                return_value=client_instance
+            )
             mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             scanner = RetireJSScanner()
@@ -405,7 +415,9 @@ class TestRetireJSScanner:
         ):
             client_instance = AsyncMock()
             client_instance.get = mock_get
-            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(
+                return_value=client_instance
+            )
             mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             scanner = RetireJSScanner()
@@ -440,7 +452,9 @@ class TestRetireJSScanner:
         ):
             client_instance = AsyncMock()
             client_instance.get = mock_get
-            mock_client_cls.return_value.__aenter__ = AsyncMock(return_value=client_instance)
+            mock_client_cls.return_value.__aenter__ = AsyncMock(
+                return_value=client_instance
+            )
             mock_client_cls.return_value.__aexit__ = AsyncMock(return_value=False)
 
             scanner = RetireJSScanner()
