@@ -40,7 +40,7 @@ Changelog = "https://github.com/ajauch/whiterabbit/blob/master/CHANGELOG.md"
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "pytest-asyncio>=0.24",
+    "pytest-asyncio>=1.4.0",
     "pytest-cov>=5.0",
     "ruff>=0.5",
     "mypy>=1.10",
