@@ -30,6 +30,7 @@ from whiterabbit.scanner import get_all_scanners
 
 LOG_PATH = Path("whiterabbit.log")
 CSV_PATH = Path("ScanResults.csv")
+REPO_CSV_PATH = Path("RepoScanResults.csv")
 CSV_HEADERS = ["URL", "Date", "Time", "Grade", "High", "Medium", "Low"]
 
 
@@ -47,9 +48,9 @@ def _setup_logging(verbose: bool = False) -> None:
         logger.addHandler(fh)
 
 
-def _append_csv(report: ScanReport) -> None:
-    write_header = not CSV_PATH.exists()
-    with CSV_PATH.open("a", newline="", encoding="utf-8") as fh:
+def _append_csv(report: ScanReport, path: Path = CSV_PATH) -> None:
+    write_header = not path.exists()
+    with path.open("a", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
         if write_header:
             writer.writerow(CSV_HEADERS)
@@ -422,7 +423,7 @@ def scanrepo(
                 )
 
         report = asyncio.run(_clone_and_scan())
-        _output_report(report, fmt, output)
+        _output_report(report, fmt, output, csv_path=REPO_CSV_PATH)
 
 
 def _run_repo_scan(
@@ -467,11 +468,13 @@ def _run_repo_scan(
             thread.join(timeout=0.12)
 
     assert report_result is not None
-    _output_report(report_result, fmt, output)
+    _output_report(report_result, fmt, output, csv_path=REPO_CSV_PATH)
 
 
-def _output_report(report: ScanReport, fmt: str, output: str | None) -> None:
-    _append_csv(report)
+def _output_report(
+    report: ScanReport, fmt: str, output: str | None, csv_path: Path = CSV_PATH
+) -> None:
+    _append_csv(report, csv_path)
 
     if fmt == "json":
         if output:
