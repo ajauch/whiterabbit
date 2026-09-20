@@ -36,6 +36,15 @@ SEVERITY_ORDER = [
 ]
 
 
+_EXCLUDED_DIRS = "tests,test,.tox,.eggs"
+
+_SKIPPED_TESTS = ",".join(
+    [
+        "B101",  # assert_used — standard in test code, not a security issue
+    ]
+)
+
+
 def _build_command(repo_path: str) -> list[str]:
     return [
         resolve_binary("bandit") or "bandit",
@@ -45,6 +54,10 @@ def _build_command(repo_path: str) -> list[str]:
         "json",
         "-q",
         "--exit-zero",
+        "--exclude",
+        _EXCLUDED_DIRS,
+        "--skip",
+        _SKIPPED_TESTS,
     ]
 
 

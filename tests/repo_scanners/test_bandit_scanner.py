@@ -90,6 +90,8 @@ class TestBuildCommand:
         assert "json" in cmd
         assert "-q" in cmd
         assert "--exit-zero" in cmd
+        assert "--exclude" in cmd
+        assert "--skip" in cmd
         assert "/tmp/repo" in cmd
 
 
