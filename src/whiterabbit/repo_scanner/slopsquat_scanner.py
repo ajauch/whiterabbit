@@ -85,7 +85,7 @@ def _extract_npm_created(data: dict[str, Any]) -> datetime | None:
         created_str = time_info.get("created")
         if created_str:
             return datetime.fromisoformat(created_str.replace("Z", "+00:00"))
-    except Exception:
+    except Exception:  # nosec B110 — best-effort date parse; None means "age unknown"
         pass
     return None
 
