@@ -64,7 +64,12 @@ class TestSlopsquatTrendmicroDataset:
     """Validate our scanner against the trendmicro hallucinated-package dataset."""
 
     def test_detects_hallucinated_packages(self, tmp_path: Path) -> None:
-        """Scanner should flag most known-hallucinated packages as non-existent."""
+        """Scanner should produce findings for most known-hallucinated packages.
+
+        For each hallucinated name, the scanner should produce either:
+        - A MEDIUM finding (package doesn't exist — 404), or
+        - A scored finding (package exists but looks suspicious)
+        """
         dataset = _fetch_dataset()
         hallucinated = _extract_hallucinated_names(dataset)
         assert len(hallucinated) > 0, "Dataset returned no hallucinated names"
@@ -79,18 +84,39 @@ class TestSlopsquatTrendmicroDataset:
 
         assert result.error is None
 
-        flagged_names = {
-            f.raw["package"] for f in result.findings if f.severity == Severity.HIGH
-        }
+        flagged_names = {f.raw["package"] for f in result.findings}
 
         detection_rate = len(flagged_names) / len(hallucinated)
         print(
             f"\nSlopsquat detection: {len(flagged_names)}/{len(hallucinated)} "
             f"({detection_rate:.0%}) hallucinated packages flagged"
         )
-        if flagged_names != hallucinated:
-            missed = sorted(hallucinated - flagged_names)
-            print(f"Missed (may have been registered): {missed}")
+
+        nonexistent = {
+            f.raw["package"]
+            for f in result.findings
+            if f.raw.get("registry_status") == 404
+        }
+        squatted = {
+            f.raw["package"]
+            for f in result.findings
+            if f.raw.get("registry_status") == 200
+        }
+        unflagged = sorted(hallucinated - flagged_names)
+
+        print(f"  Non-existent (404): {len(nonexistent)}")
+        print(f"  Squatted (scored): {len(squatted)}")
+        if squatted:
+            scored_findings = [
+                f for f in result.findings if f.raw.get("registry_status") == 200
+            ]
+            for f in sorted(scored_findings, key=lambda x: -x.raw["threat_score"]):
+                print(
+                    f"    {f.raw['package']}: score={f.raw['threat_score']} "
+                    f"severity={f.severity.value}"
+                )
+        if unflagged:
+            print(f"  Unflagged (legitimate or below threshold): {unflagged}")
 
         assert detection_rate >= MIN_DETECTION_RATE, (
             f"Detection rate {detection_rate:.0%} is below "
@@ -98,11 +124,10 @@ class TestSlopsquatTrendmicroDataset:
         )
 
     def test_does_not_flag_real_packages(self, tmp_path: Path) -> None:
-        """Scanner should not flag legitimate packages from the dataset."""
+        """Scanner should not produce HIGH/CRITICAL findings for legitimate packages."""
         dataset = _fetch_dataset()
         _hallucinated, real = _extract_all_names(dataset)
 
-        # Use a sample of real packages to keep the test fast
         real_sample = sorted(real)[:20]
         assert len(real_sample) > 0, "Dataset returned no real package names"
 
@@ -114,14 +139,22 @@ class TestSlopsquatTrendmicroDataset:
 
         assert result.error is None
 
-        false_positives = [f for f in result.findings if f.severity == Severity.HIGH]
-        if false_positives:
-            fp_names = [f.raw["package"] for f in false_positives]
-            print(f"\nFalse positives: {fp_names}")
+        severe_false_positives = [
+            f
+            for f in result.findings
+            if f.severity in (Severity.HIGH, Severity.CRITICAL)
+        ]
+        if severe_false_positives:
+            for f in severe_false_positives:
+                print(
+                    f"\nFalse positive: {f.raw['package']} "
+                    f"score={f.raw.get('threat_score', 'n/a')} "
+                    f"severity={f.severity.value}"
+                )
 
-        assert len(false_positives) == 0, (
-            f"Real packages falsely flagged: "
-            f"{[f.raw['package'] for f in false_positives]}"
+        assert len(severe_false_positives) == 0, (
+            f"Real packages falsely flagged as HIGH/CRITICAL: "
+            f"{[f.raw['package'] for f in severe_false_positives]}"
         )
 
     def test_mixed_manifest_separation(self, tmp_path: Path) -> None:
@@ -141,16 +174,18 @@ class TestSlopsquatTrendmicroDataset:
 
         assert result.error is None
 
-        flagged_names = {
-            f.raw["package"] for f in result.findings if f.severity == Severity.HIGH
-        }
+        flagged_names = {f.raw["package"] for f in result.findings}
 
         correctly_flagged = flagged_names & set(hallucinated_sample)
-        false_positives = flagged_names & set(real_sample)
+        false_positives = {
+            f.raw["package"]
+            for f in result.findings
+            if f.severity in (Severity.HIGH, Severity.CRITICAL)
+        } & set(real_sample)
 
         print(
             f"\nMixed test: {len(correctly_flagged)}/{len(hallucinated_sample)} "
-            f"hallucinated flagged, {len(false_positives)} false positives"
+            f"hallucinated flagged, {len(false_positives)} severe false positives"
         )
 
         assert len(false_positives) == 0, (
