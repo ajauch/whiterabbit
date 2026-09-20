@@ -46,6 +46,8 @@ def _classify_specifier(specifier: str) -> Severity | None:
         return None
     if _EXACT_NPM_VERSION_RE.match(stripped):
         return None
+    if stripped.startswith((">=", "~=", "^", "~")):
+        return Severity.LOW
     return Severity.MEDIUM
 
 

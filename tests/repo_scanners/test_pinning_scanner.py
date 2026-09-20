@@ -48,17 +48,17 @@ class TestClassifySpecifier:
     def test_prerelease_exact_is_none(self) -> None:
         assert _classify_specifier("1.0.0-beta.1") is None
 
-    def test_caret_is_medium(self) -> None:
-        assert _classify_specifier("^4.18.2") is Severity.MEDIUM
+    def test_caret_is_low(self) -> None:
+        assert _classify_specifier("^4.18.2") is Severity.LOW
 
-    def test_tilde_is_medium(self) -> None:
-        assert _classify_specifier("~4.18.2") is Severity.MEDIUM
+    def test_tilde_is_low(self) -> None:
+        assert _classify_specifier("~4.18.2") is Severity.LOW
 
-    def test_tilde_compat_is_medium(self) -> None:
-        assert _classify_specifier("~=3.0") is Severity.MEDIUM
+    def test_tilde_compat_is_low(self) -> None:
+        assert _classify_specifier("~=3.0") is Severity.LOW
 
-    def test_gte_is_medium(self) -> None:
-        assert _classify_specifier(">=2.0") is Severity.MEDIUM
+    def test_gte_is_low(self) -> None:
+        assert _classify_specifier(">=2.0") is Severity.LOW
 
     def test_gt_is_medium(self) -> None:
         assert _classify_specifier(">1.0") is Severity.MEDIUM
@@ -72,12 +72,12 @@ class TestClassifySpecifier:
     def test_ne_is_medium(self) -> None:
         assert _classify_specifier("!=1.0") is Severity.MEDIUM
 
-    def test_range_is_medium(self) -> None:
-        assert _classify_specifier(">=1.0,<2.0") is Severity.MEDIUM
+    def test_range_starting_with_gte_is_low(self) -> None:
+        assert _classify_specifier(">=1.0,<2.0") is Severity.LOW
 
     def test_whitespace_stripped(self) -> None:
         assert _classify_specifier("  ==2.0  ") is None
-        assert _classify_specifier("  >=2.0  ") is Severity.MEDIUM
+        assert _classify_specifier("  >=2.0  ") is Severity.LOW
         assert _classify_specifier("   ") is Severity.HIGH
 
 
@@ -325,11 +325,11 @@ class TestDepsToFindings:
         assert findings[0].severity == Severity.HIGH
         assert "Unpinned" in findings[0].title
 
-    def test_loose_pin_creates_medium(self) -> None:
+    def test_loose_pin_creates_low(self) -> None:
         deps = [DepSpec("requests", ">=2.0", "requirements.txt", 1)]
         findings = _deps_to_findings(deps)
         assert len(findings) == 1
-        assert findings[0].severity == Severity.MEDIUM
+        assert findings[0].severity == Severity.LOW
         assert "Loosely pinned" in findings[0].title
 
     def test_exact_pin_creates_no_finding(self) -> None:
@@ -434,7 +434,7 @@ class TestPinningScanner:
         assert len(result.findings) == 2
         severities = {f.severity for f in result.findings}
         assert Severity.HIGH in severities
-        assert Severity.MEDIUM in severities
+        assert Severity.LOW in severities
 
     def test_package_json_with_loose_pins(self, tmp_path: Path) -> None:
         pkg = tmp_path / "package.json"
@@ -454,7 +454,7 @@ class TestPinningScanner:
         result = asyncio.run(scanner.scan(str(tmp_path), config))
         assert result.error is None
         assert len(result.findings) == 1
-        assert result.findings[0].severity == Severity.MEDIUM
+        assert result.findings[0].severity == Severity.LOW
 
     def test_missing_lockfile_detected(self, tmp_path: Path) -> None:
         pkg = tmp_path / "package.json"
