@@ -50,20 +50,29 @@ def _setup_logging(verbose: bool = False) -> None:
 
 def _append_csv(report: ScanReport, path: Path = CSV_PATH) -> None:
     write_header = not path.exists()
-    with path.open("a", newline="", encoding="utf-8") as fh:
-        writer = csv.writer(fh)
-        if write_header:
-            writer.writerow(CSV_HEADERS)
-        writer.writerow(
-            [
-                report.target,
-                report.scan_date.strftime("%Y-%m-%d"),
-                report.scan_date.strftime("%H:%M:%S"),
-                report.grade,
-                report.summary.get(Severity.HIGH, 0),
-                report.summary.get(Severity.MEDIUM, 0),
-                report.summary.get(Severity.LOW, 0),
-            ]
+    try:
+        with path.open("a", newline="", encoding="utf-8") as fh:
+            writer = csv.writer(fh)
+            if write_header:
+                writer.writerow(CSV_HEADERS)
+            writer.writerow(
+                [
+                    report.target,
+                    report.scan_date.strftime("%Y-%m-%d"),
+                    report.scan_date.strftime("%H:%M:%S"),
+                    report.grade,
+                    report.summary.get(Severity.HIGH, 0),
+                    report.summary.get(Severity.MEDIUM, 0),
+                    report.summary.get(Severity.LOW, 0),
+                ]
+            )
+    except PermissionError:
+        logging.getLogger("whiterabbit").warning(
+            "Could not write to %s (file may be open in another program)", path
+        )
+        Console().print(
+            f"[yellow]Warning: Could not write to {path} — "
+            f"is it open in another program?[/yellow]"
         )
 
 
