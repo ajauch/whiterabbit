@@ -193,8 +193,105 @@ class TestTestSSLScanner:
         assert scanner.name == "testssl"
         assert scanner.display_name == "Deep TLS Scanner"
         assert scanner.required_binaries == []
-        assert hasattr(scanner, "is_available")
-        assert hasattr(scanner, "check_dependencies")
+
+    def test_is_available_when_testssl_found(self) -> None:
+        with (
+            patch(
+                "whiterabbit.scanner.testssl_scanner._find_testssl",
+                return_value="/usr/bin/testssl.sh",
+            ),
+            patch("whiterabbit.scanner.testssl_scanner.sys.platform", "linux"),
+        ):
+            scanner = TestSSLScanner()
+            assert scanner.is_available() is True
+
+    def test_is_available_when_testssl_not_found(self) -> None:
+        with patch(
+            "whiterabbit.scanner.testssl_scanner._find_testssl",
+            return_value=None,
+        ):
+            scanner = TestSSLScanner()
+            assert scanner.is_available() is False
+
+    def test_check_dependencies_when_testssl_found(self) -> None:
+        with (
+            patch(
+                "whiterabbit.scanner.testssl_scanner._find_testssl",
+                return_value="/usr/bin/testssl.sh",
+            ),
+            patch("whiterabbit.scanner.testssl_scanner.sys.platform", "linux"),
+        ):
+            scanner = TestSSLScanner()
+            assert scanner.check_dependencies() == []
+
+    def test_check_dependencies_when_testssl_not_found(self) -> None:
+        with patch(
+            "whiterabbit.scanner.testssl_scanner._find_testssl",
+            return_value=None,
+        ):
+            scanner = TestSSLScanner()
+            missing = scanner.check_dependencies()
+            assert len(missing) == 1
+            assert "testssl.sh" in missing[0]
+
+    def test_is_available_windows_with_git_bash(self) -> None:
+        with (
+            patch(
+                "whiterabbit.scanner.testssl_scanner._find_testssl",
+                return_value="/c/tools/testssl.sh",
+            ),
+            patch(
+                "whiterabbit.scanner.testssl_scanner.shutil.which",
+                return_value=None,
+            ),
+            patch("whiterabbit.scanner.testssl_scanner.sys.platform", "win32"),
+            patch(
+                "whiterabbit.scanner.testssl_scanner._find_git_bash",
+                return_value="C:\\Program Files\\Git\\bin\\bash.exe",
+            ),
+        ):
+            scanner = TestSSLScanner()
+            assert scanner.is_available() is True
+
+    def test_is_available_windows_without_git_bash(self) -> None:
+        with (
+            patch(
+                "whiterabbit.scanner.testssl_scanner._find_testssl",
+                return_value="/c/tools/testssl.sh",
+            ),
+            patch(
+                "whiterabbit.scanner.testssl_scanner.shutil.which",
+                return_value=None,
+            ),
+            patch("whiterabbit.scanner.testssl_scanner.sys.platform", "win32"),
+            patch(
+                "whiterabbit.scanner.testssl_scanner._find_git_bash",
+                return_value=None,
+            ),
+        ):
+            scanner = TestSSLScanner()
+            assert scanner.is_available() is False
+
+    def test_check_dependencies_windows_without_git_bash(self) -> None:
+        with (
+            patch(
+                "whiterabbit.scanner.testssl_scanner._find_testssl",
+                return_value="/c/tools/testssl.sh",
+            ),
+            patch(
+                "whiterabbit.scanner.testssl_scanner.shutil.which",
+                return_value=None,
+            ),
+            patch("whiterabbit.scanner.testssl_scanner.sys.platform", "win32"),
+            patch(
+                "whiterabbit.scanner.testssl_scanner._find_git_bash",
+                return_value=None,
+            ),
+        ):
+            scanner = TestSSLScanner()
+            missing = scanner.check_dependencies()
+            assert len(missing) == 1
+            assert "Git Bash" in missing[0]
 
     def test_successful_scan_with_findings(self) -> None:
         output = json.dumps(
