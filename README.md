@@ -38,13 +38,16 @@ pip install -e ".[dev]"
 
 ### External dependencies
 
-Most scanners are pure Python. Three require external binaries:
+Most scanners are pure Python. Several require external binaries:
 
 | Binary | Required by | Install |
 |--------|-------------|---------|
 | [Nuclei](https://github.com/projectdiscovery/nuclei#install-nuclei) | `nuclei` web scanner | `go install github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest` |
 | [testssl.sh](https://github.com/drwetter/testssl.sh#install) | `testssl` web scanner | Clone the repo or install via package manager |
 | [Semgrep](https://semgrep.dev/docs/getting-started/) | `owasp` repo scanner | `pip install semgrep` or `brew install semgrep` |
+| [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) | `trivy` repo scanner | `brew install trivy` or [GitHub releases](https://github.com/aquasecurity/trivy/releases) |
+| [TruffleHog](https://github.com/trufflesecurity/trufflehog#installation) | `secret` repo scanner | `brew install trufflehog` or `go install github.com/trufflesecurity/trufflehog/v3@latest` |
+| [Bandit](https://bandit.readthedocs.io/) | `bandit` repo scanner | `pip install bandit` |
 
 **testssl.sh on Windows:** WhiteRabbit invokes testssl.sh through Git Bash. It
 searches PATH first, then falls back to the path in the `WHITERABBIT_TESTSSL_PATH`
@@ -152,6 +155,9 @@ whiterabbit check-repo-deps
 |---------|---------------|--------------|
 | `cve` | Known vulnerabilities in project dependencies via the [OSV.dev](https://osv.dev/) API. Parses `requirements.txt`, `pyproject.toml`, `package.json`, and `package-lock.json`. | None (pure Python) |
 | `owasp` | OWASP Top 10 code vulnerabilities via static analysis with the [Semgrep](https://semgrep.dev/) `p/owasp-top-ten` ruleset | [Semgrep](https://semgrep.dev/docs/getting-started/) |
+| `trivy` | Dependency CVEs across 15+ ecosystems, IaC misconfigurations, and license compliance | [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) |
+| `secret` | Committed secrets and credentials detection with verification | [TruffleHog](https://github.com/trufflesecurity/trufflehog#installation) |
+| `bandit` | Python-specific security linting (hardcoded passwords, unsafe deserialization, weak crypto, etc.) | [Bandit](https://bandit.readthedocs.io/) |
 
 ## Architecture
 
@@ -177,7 +183,10 @@ CLI (cli.py)
      └─ RepoScanRunner (repo_runner.py)
          └─ asyncio.TaskGroup
              ├─ CVEScanner        → ScanResult
-             └─ OWASPScanner      → ScanResult
+             ├─ OWASPScanner      → ScanResult
+             ├─ TrivyScanner      → ScanResult
+             ├─ SecretScanner     → ScanResult
+             └─ BanditScanner     → ScanResult
                      │
                      ▼
              ScanReport (aggregated findings + letter grade)
