@@ -240,6 +240,21 @@ queries public vulnerability databases (OSV.dev, PyPI, npm registry). No
 traffic is sent to the scanned application itself. You still need appropriate
 access rights to the source code.
 
+## Branch protection
+
+The `master` branch enforces the following rules:
+
+| Control | Status |
+|---------|--------|
+| CI must pass (tests, lint, type check) | Runs on every push and PR; not yet a required status check |
+| Pull request review | Required — 1 approving review, stale reviews dismissed on new pushes |
+| Signed commits | Not required |
+| Force pushes | Blocked |
+| Admin bypass | Admins can bypass the above rules |
+
+CI runs across a 2×3 matrix (Ubuntu + Windows, Python 3.11–3.13) and gates on
+`pytest` (≥80 % coverage), `ruff check`, `ruff format`, and `mypy`.
+
 ## Adding a scanner
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for instructions on adding new web

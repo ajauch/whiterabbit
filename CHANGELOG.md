@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Recursive manifest discovery — finds dependency files in subdirectories,
   skipping `node_modules`, `.git`, `__pycache__`, `.venv`, and `vendor`.
 - Scan results appended to `RepoScanResults.csv` (separate from web scan CSV).
+- Branch protection policy documented in README — CI, review, signing, and
+  force-push rules.
 
 ### Changed
 
