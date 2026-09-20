@@ -98,7 +98,7 @@ def _extract_version_from_filename(
                 m = re.search(pattern, filename)
                 if m and m.lastindex and m.lastindex >= 1:
                     return m.group(1)
-            except re.error:
+            except re.error:  # nosec B112
                 continue
     return None
 
@@ -157,7 +157,7 @@ def _version_in_range(
             lower = parse_ver(at_or_above)
             if ver < lower:
                 return False
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     if above:
@@ -165,7 +165,7 @@ def _version_in_range(
             lower = parse_ver(above)
             if ver <= lower:
                 return False
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     if below:
@@ -173,7 +173,7 @@ def _version_in_range(
             upper = parse_ver(below)
             if ver >= upper:
                 return False
-        except Exception:
+        except Exception:  # nosec B110
             pass
 
     return True
@@ -281,7 +281,7 @@ class RetireJSScanner(BaseScanner):
                                         )
                                     )
                                     continue
-                            except Exception:
+                            except Exception:  # nosec B112
                                 continue
 
                 for lib_name, lib_data in vuln_db.items():

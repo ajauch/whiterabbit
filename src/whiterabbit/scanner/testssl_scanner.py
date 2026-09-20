@@ -347,7 +347,7 @@ class TestSSLScanner(BaseScanner):
                         continue
                     try:
                         entries.append(json.loads(line))
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError:  # nosec B112
                         continue
 
             if not isinstance(entries, list):

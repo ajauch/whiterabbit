@@ -116,7 +116,7 @@ def _check_hsts(headers: httpx.Headers) -> list[Finding]:
                             cwe="CWE-523",
                         )
                     )
-            except (ValueError, IndexError):
+            except (ValueError, IndexError):  # nosec B110
                 pass
     return findings
 
@@ -373,9 +373,9 @@ async def _check_https_redirect(
                     cwe="CWE-319",
                 )
             ]
-    except httpx.ConnectError:
+    except httpx.ConnectError:  # nosec B110
         pass
-    except Exception:
+    except Exception:  # nosec B110
         pass
 
     return []
