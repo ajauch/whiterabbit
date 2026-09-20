@@ -127,7 +127,7 @@ def _extract_version_from_content(
 def _check_hash(content: str, hashes: dict[str, str]) -> str | None:
     if not hashes:
         return None
-    sha1 = hashlib.sha1(content.encode()).hexdigest()  # nosec B324 — not cryptographic; matching RetireJS DB lookup keys
+    sha1 = hashlib.sha1(content.encode()).hexdigest()  # nosec B324 # nosemgrep — not cryptographic; matching RetireJS DB lookup keys
     return hashes.get(sha1)
 
 
