@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 from datetime import UTC, datetime
 from typing import ClassVar
 
@@ -22,6 +23,61 @@ SEMGREP_SEVERITY_MAP: dict[str, Severity] = {
 }
 
 DEFAULT_CONFIG = "p/owasp-top-ten"
+
+# ---------------------------------------------------------------------------
+# GitHub Actions shell-injection false-positive filtering
+# ---------------------------------------------------------------------------
+# Semgrep flags every ${{ }} in a workflow `run:` step as potential shell
+# injection, but only expressions referencing *user-controlled* input are
+# actually exploitable.  Everything else (github.sha, secrets.*, steps.*,
+# env.*, etc.) is safe and produces noise that drowns real findings.
+
+_GHA_UNTRUSTED_CONTEXTS: set[str] = {
+    "github.head_ref",
+    "github.event.issue.title",
+    "github.event.issue.body",
+    "github.event.pull_request.title",
+    "github.event.pull_request.body",
+    "github.event.pull_request.head.ref",
+    "github.event.pull_request.head.label",
+    "github.event.comment.body",
+    "github.event.review.body",
+    "github.event.review_comment.body",
+    "github.event.discussion.title",
+    "github.event.discussion.body",
+    "github.event.head_commit.message",
+    "github.event.head_commit.author.email",
+    "github.event.head_commit.author.name",
+    "github.event.workflow_run.head_branch",
+    "github.event.workflow_run.head_commit.message",
+    "github.event.workflow_run.head_commit.author.email",
+    "github.event.workflow_run.head_commit.author.name",
+}
+
+_GHA_UNTRUSTED_PREFIXES: tuple[str, ...] = (
+    "github.event.commits[",
+    "github.event.commits.",
+    "github.event.pages[",
+    "github.event.pages.",
+)
+
+_GHA_EXPR_RE = re.compile(r"\$\{\{\s*(.+?)\s*\}\}")
+
+
+def _gha_expr_is_untrusted(expr: str) -> bool:
+    """Check if a single GitHub Actions expression references untrusted input."""
+    if any(ctx in expr for ctx in _GHA_UNTRUSTED_CONTEXTS):
+        return True
+    return any(prefix in expr for prefix in _GHA_UNTRUSTED_PREFIXES)
+
+
+def _has_untrusted_gha_expression(source: str) -> bool:
+    """Return True if any ``${{ }}`` expression in *source* references
+    user-controlled input that could enable shell injection."""
+    for match in _GHA_EXPR_RE.finditer(source):
+        if _gha_expr_is_untrusted(match.group(1)):
+            return True
+    return False
 
 
 def _build_command(repo_path: str, timeout: int) -> list[str]:
@@ -59,6 +115,11 @@ def _parse_semgrep_output(raw: str) -> list[Finding]:
         seen.add(dedup_key)
 
         extra = result.get("extra", {})
+
+        if "run-shell-injection" in check_id:
+            lines = extra.get("lines", "")
+            if lines and not _has_untrusted_gha_expression(lines):
+                continue
         severity_str = extra.get("severity", "INFO")
         severity = SEMGREP_SEVERITY_MAP.get(severity_str, Severity.LOW)
 
