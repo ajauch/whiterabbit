@@ -158,6 +158,7 @@ whiterabbit check-repo-deps
 | `trivy` | Dependency CVEs across 15+ ecosystems, IaC misconfigurations, and license compliance | [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) |
 | `secret` | Committed secrets and credentials detection with verification | [TruffleHog](https://github.com/trufflesecurity/trufflehog#installation) |
 | `bandit` | Python-specific security linting (hardcoded passwords, unsafe deserialization, weak crypto, etc.) | [Bandit](https://bandit.readthedocs.io/) |
+| `slopsquat` | Detects hallucinated or non-existent packages in dependency manifests by checking PyPI and npm registries. Flags packages that don't exist (HIGH) and suspiciously new packages created within the last 7 days (LOW). | None (pure Python) |
 
 ## Architecture
 
@@ -186,7 +187,8 @@ CLI (cli.py)
              ├─ OWASPScanner      → ScanResult
              ├─ TrivyScanner      → ScanResult
              ├─ SecretScanner     → ScanResult
-             └─ BanditScanner     → ScanResult
+             ├─ BanditScanner     → ScanResult
+             └─ SlopsquatScanner  → ScanResult
                      │
                      ▼
              ScanReport (aggregated findings + letter grade)
@@ -227,9 +229,10 @@ enabled to download its vulnerability database from GitHub
 target. Only scan targets you own or have explicit permission to test.
 Unauthorized scanning may violate laws and terms of service.
 
-**Repository scanning** is offline static analysis — it reads local files and
-queries public vulnerability databases. No traffic is sent to the scanned
-application. You still need appropriate access rights to the source code.
+**Repository scanning** is static analysis — it reads local files and
+queries public vulnerability databases (OSV.dev, PyPI, npm registry). No
+traffic is sent to the scanned application itself. You still need appropriate
+access rights to the source code.
 
 ## Adding a scanner
 

@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - `list-repo-scanners` and `check-repo-deps` CLI commands.
 - Automatic git clone with temp directory cleanup for remote repo URLs.
 - `--branch`, `--depth`, and `--keep-clone` options for `scanrepo`.
+- Slopsquat scanner (`slopsquat`) — detects hallucinated or non-existent
+  packages in dependency manifests by checking PyPI and npm registries.
+  Flags non-existent packages (HIGH) and recently created packages less
+  than 7 days old (LOW). Pure Python, no external dependencies.
+- Shared manifest parsing module (`repo_scanner/manifest.py`) — extracted
+  from the CVE scanner for reuse across dependency-aware scanners.
 - Recursive manifest discovery — finds dependency files in subdirectories,
   skipping `node_modules`, `.git`, `__pycache__`, `.venv`, and `vendor`.
 - Scan results appended to `RepoScanResults.csv` (separate from web scan CSV).
