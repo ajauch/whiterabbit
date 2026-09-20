@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   packages in dependency manifests by checking PyPI and npm registries.
   Flags non-existent packages (HIGH) and recently created packages less
   than 7 days old (LOW). Pure Python, no external dependencies.
+- Dependency pinning scanner (`pinning`) — detects unpinned or loosely pinned
+  dependencies in `requirements.txt`, `pyproject.toml`, and `package.json`.
+  Flags bare names and `*`/`latest` (HIGH), loose constraints like `>=`, `^`,
+  `~` (MEDIUM), and missing lockfiles for npm projects (MEDIUM). Pure Python,
+  no external dependencies.
+- Log leak scanner (`logleak`) — detects logging statements that may expose
+  sensitive data such as passwords, API keys, tokens, PII, and full request
+  bodies. Uses string-literal stripping to distinguish variable references from
+  literal message text, minimizing false positives. Supports Python, JS/TS,
+  Java, Go, Ruby, and PHP. CWE-532. Pure Python, no external dependencies.
 - Shared manifest parsing module (`repo_scanner/manifest.py`) — extracted
   from the CVE scanner for reuse across dependency-aware scanners.
 - Recursive manifest discovery — finds dependency files in subdirectories,

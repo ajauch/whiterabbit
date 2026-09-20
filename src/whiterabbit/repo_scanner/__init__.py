@@ -9,7 +9,9 @@ if TYPE_CHECKING:
 
 from whiterabbit.repo_scanner.bandit_scanner import BanditScanner
 from whiterabbit.repo_scanner.cve_scanner import CVEScanner
+from whiterabbit.repo_scanner.logleak_scanner import LogLeakScanner
 from whiterabbit.repo_scanner.owasp_scanner import OWASPScanner
+from whiterabbit.repo_scanner.pinning_scanner import PinningScanner
 from whiterabbit.repo_scanner.secret_scanner import SecretScanner
 from whiterabbit.repo_scanner.slopsquat_scanner import SlopsquatScanner
 from whiterabbit.repo_scanner.trivy_scanner import TrivyScanner
@@ -21,6 +23,8 @@ REPO_SCANNER_REGISTRY: dict[str, type[BaseRepoScanner]] = {
     "secret": SecretScanner,
     "bandit": BanditScanner,
     "slopsquat": SlopsquatScanner,
+    "pinning": PinningScanner,
+    "logleak": LogLeakScanner,
 }
 
 

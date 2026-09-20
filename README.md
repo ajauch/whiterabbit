@@ -159,6 +159,8 @@ whiterabbit check-repo-deps
 | `secret` | Committed secrets and credentials detection with verification | [TruffleHog](https://github.com/trufflesecurity/trufflehog#installation) |
 | `bandit` | Python-specific security linting (hardcoded passwords, unsafe deserialization, weak crypto, etc.) | [Bandit](https://bandit.readthedocs.io/) |
 | `slopsquat` | Detects hallucinated or non-existent packages in dependency manifests by checking PyPI and npm registries. Flags packages that don't exist (HIGH) and suspiciously new packages created within the last 7 days (LOW). | None (pure Python) |
+| `pinning` | Detects unpinned or loosely pinned dependencies that create supply-chain risk. Flags bare names and `*`/`latest` (HIGH), loose constraints like `>=`, `^`, `~` (MEDIUM), and missing lockfiles (MEDIUM). Parses `requirements.txt`, `pyproject.toml`, and `package.json`. | None (pure Python) |
+| `logleak` | Detects logging statements that may expose sensitive data — passwords, API keys, tokens, PII, and full request bodies. Distinguishes variable references from string literals to minimize false positives. Supports Python, JS/TS, Java, Go, Ruby, and PHP. CWE-532. | None (pure Python) |
 
 ## Architecture
 
@@ -188,7 +190,9 @@ CLI (cli.py)
              ├─ TrivyScanner      → ScanResult
              ├─ SecretScanner     → ScanResult
              ├─ BanditScanner     → ScanResult
-             └─ SlopsquatScanner  → ScanResult
+             ├─ SlopsquatScanner  → ScanResult
+             ├─ PinningScanner    → ScanResult
+             └─ LogLeakScanner    → ScanResult
                      │
                      ▼
              ScanReport (aggregated findings + letter grade)
