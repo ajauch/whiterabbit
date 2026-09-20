@@ -208,6 +208,21 @@ Create `tests/repo_scanners/test_your_scanner.py` with:
 - Unit tests using mocked responses (no network calls, no real subprocess)
 - At least one end-to-end test (can be marked `@pytest.mark.integration`)
 
+### 4. Provide public test repos
+
+If your scanner targets a specific language or ecosystem, your PR must include
+**at least three public repositories** that can be used as real-world test
+targets. These should be:
+
+- **Large enough** to exercise the scanner meaningfully (not toy projects)
+- **Permissively licensed** (MIT, Apache 2.0, etc.) so anyone can clone them
+- **Likely to contain findings** — the point is to verify the scanner produces
+  useful output, not to scan pristine code
+
+List them in your PR description with a short note on why each is a good target.
+For example, a C# scanner PR might reference `dotnet/aspnetcore`,
+`bitwarden/server`, and `jellyfin/jellyfin`.
+
 ### Key rules
 
 Same as web scanners, plus:
