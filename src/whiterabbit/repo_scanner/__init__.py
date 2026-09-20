@@ -7,12 +7,18 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from whiterabbit.repo_scanner.base import BaseRepoScanner
 
+from whiterabbit.repo_scanner.bandit_scanner import BanditScanner
 from whiterabbit.repo_scanner.cve_scanner import CVEScanner
 from whiterabbit.repo_scanner.owasp_scanner import OWASPScanner
+from whiterabbit.repo_scanner.secret_scanner import SecretScanner
+from whiterabbit.repo_scanner.trivy_scanner import TrivyScanner
 
 REPO_SCANNER_REGISTRY: dict[str, type[BaseRepoScanner]] = {
     "cve": CVEScanner,
     "owasp": OWASPScanner,
+    "trivy": TrivyScanner,
+    "secret": SecretScanner,
+    "bandit": BanditScanner,
 }
 
 

@@ -52,7 +52,7 @@ WhiteRabbit is a local web security scanner. Src layout: `src/whiterabbit/`.
 
 **Repo scanner contract:** Repo scanners subclass `BaseRepoScanner` (`repo_scanner/base.py`). Same contract as `BaseScanner` but `scan()` takes `repo_path` (local dir) + `RepoScanConfig`. Registered in `REPO_SCANNER_REGISTRY` in `repo_scanner/__init__.py`.
 
-**Repo scanners:** `cve` (pure Python, parses dependency manifests and queries OSV.dev API), `owasp` (Semgrep subprocess, requires `semgrep` binary).
+**Repo scanners:** `cve` (pure Python, parses dependency manifests and queries OSV.dev API), `owasp` (Semgrep subprocess, requires `semgrep` binary), `trivy` (subprocess, requires `trivy` binary — dependency CVEs across 15+ ecosystems, IaC misconfigs, license compliance), `secret` (subprocess, requires `trufflehog` binary — secret/credential detection with verification), `bandit` (subprocess, requires `bandit` binary — Python-specific security linting).
 
 ## Testing patterns
 
