@@ -11,12 +11,14 @@ from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.cve_scanner import (
     CVEScanner,
     _cvss_to_severity,
-    _detect_ecosystems,
     _osv_to_findings,
-    _parse_package_json,
-    _parse_package_lock_json,
-    _parse_pyproject_toml,
-    _parse_requirements_txt,
+)
+from whiterabbit.repo_scanner.manifest import (
+    detect_ecosystems,
+    parse_package_json,
+    parse_package_lock_json,
+    parse_pyproject_toml,
+    parse_requirements_txt,
 )
 from whiterabbit.report.models import Severity
 
@@ -25,27 +27,27 @@ class TestParseRequirementsTxt:
     def test_pinned_versions(self, tmp_path: Path) -> None:
         req = tmp_path / "requirements.txt"
         req.write_text("requests==2.31.0\nflask==3.0.0\n")
-        result = _parse_requirements_txt(req)
+        result = parse_requirements_txt(req)
         assert ("requests", "2.31.0") in result
         assert ("flask", "3.0.0") in result
 
     def test_ignores_comments_and_flags(self, tmp_path: Path) -> None:
         req = tmp_path / "requirements.txt"
         req.write_text("# comment\n-r other.txt\nrequests==2.31.0\n")
-        result = _parse_requirements_txt(req)
+        result = parse_requirements_txt(req)
         assert len(result) == 1
         assert result[0] == ("requests", "2.31.0")
 
     def test_ignores_unpinned(self, tmp_path: Path) -> None:
         req = tmp_path / "requirements.txt"
         req.write_text("requests>=2.0\nflask\n")
-        result = _parse_requirements_txt(req)
+        result = parse_requirements_txt(req)
         assert len(result) == 0
 
     def test_empty_file(self, tmp_path: Path) -> None:
         req = tmp_path / "requirements.txt"
         req.write_text("")
-        result = _parse_requirements_txt(req)
+        result = parse_requirements_txt(req)
         assert result == []
 
 
@@ -55,14 +57,14 @@ class TestParsePyprojectToml:
         toml.write_text(
             '[project]\ndependencies = [\n  "requests==2.31.0",\n  "flask==3.0.0",\n]\n'
         )
-        result = _parse_pyproject_toml(toml)
+        result = parse_pyproject_toml(toml)
         assert ("requests", "2.31.0") in result
         assert ("flask", "3.0.0") in result
 
     def test_ignores_unpinned(self, tmp_path: Path) -> None:
         toml = tmp_path / "pyproject.toml"
         toml.write_text('[project]\ndependencies = [\n  "requests>=2.0",\n]\n')
-        result = _parse_pyproject_toml(toml)
+        result = parse_pyproject_toml(toml)
         assert len(result) == 0
 
 
@@ -77,20 +79,20 @@ class TestParsePackageJson:
                 }
             )
         )
-        result = _parse_package_json(pj)
+        result = parse_package_json(pj)
         assert ("express", "4.18.2") in result
         assert ("jest", "29.7.0") in result
 
     def test_empty_deps(self, tmp_path: Path) -> None:
         pj = tmp_path / "package.json"
         pj.write_text(json.dumps({"name": "test"}))
-        result = _parse_package_json(pj)
+        result = parse_package_json(pj)
         assert result == []
 
     def test_invalid_json(self, tmp_path: Path) -> None:
         pj = tmp_path / "package.json"
         pj.write_text("not json")
-        result = _parse_package_json(pj)
+        result = parse_package_json(pj)
         assert result == []
 
 
@@ -108,7 +110,7 @@ class TestParsePackageLockJson:
                 }
             )
         )
-        result = _parse_package_lock_json(lock)
+        result = parse_package_lock_json(lock)
         assert ("express", "4.18.2") in result
         assert len(result) == 1
 
@@ -122,14 +124,14 @@ class TestParsePackageLockJson:
                 }
             )
         )
-        result = _parse_package_lock_json(lock)
+        result = parse_package_lock_json(lock)
         assert ("lodash", "4.17.21") in result
 
 
 class TestDetectEcosystems:
     def test_python_project(self, tmp_path: Path) -> None:
         (tmp_path / "requirements.txt").write_text("requests==2.31.0\n")
-        result = _detect_ecosystems(str(tmp_path))
+        result = detect_ecosystems(str(tmp_path))
         assert "PyPI" in result
         assert ("requests", "2.31.0") in result["PyPI"]
 
@@ -137,11 +139,11 @@ class TestDetectEcosystems:
         (tmp_path / "package.json").write_text(
             json.dumps({"dependencies": {"express": "^4.18.2"}})
         )
-        result = _detect_ecosystems(str(tmp_path))
+        result = detect_ecosystems(str(tmp_path))
         assert "npm" in result
 
     def test_no_manifests(self, tmp_path: Path) -> None:
-        result = _detect_ecosystems(str(tmp_path))
+        result = detect_ecosystems(str(tmp_path))
         assert result == {}
 
     def test_mixed_project(self, tmp_path: Path) -> None:
@@ -149,7 +151,7 @@ class TestDetectEcosystems:
         (tmp_path / "package.json").write_text(
             json.dumps({"dependencies": {"react": "^18.0.0"}})
         )
-        result = _detect_ecosystems(str(tmp_path))
+        result = detect_ecosystems(str(tmp_path))
         assert "PyPI" in result
         assert "npm" in result
 
@@ -162,7 +164,7 @@ class TestDetectEcosystems:
         (frontend / "package.json").write_text(
             json.dumps({"dependencies": {"react": "^18.0.0"}})
         )
-        result = _detect_ecosystems(str(tmp_path))
+        result = detect_ecosystems(str(tmp_path))
         assert "PyPI" in result
         assert ("django", "4.2.0") in result["PyPI"]
         assert "npm" in result
@@ -177,7 +179,7 @@ class TestDetectEcosystems:
         (tmp_path / "package.json").write_text(
             json.dumps({"dependencies": {"express": "^4.18.2"}})
         )
-        result = _detect_ecosystems(str(tmp_path))
+        result = detect_ecosystems(str(tmp_path))
         pkgs = [name for name, _ in result.get("npm", [])]
         assert "express" in pkgs
         assert "hidden" not in pkgs

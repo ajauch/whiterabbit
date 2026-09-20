@@ -1,141 +1,23 @@
-"""Dependency CVE scanner — parses manifests and queries the OSV.dev API."""
+"""Dependency CVE scanner — queries the OSV.dev API for known vulnerabilities."""
 
 from __future__ import annotations
 
-import json
 import logging
-import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 import httpx
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
+from whiterabbit.repo_scanner.manifest import detect_ecosystems
 from whiterabbit.report.models import Finding, ScanResult, Severity
 
 log = logging.getLogger("whiterabbit")
 
 OSV_BATCH_URL = "https://api.osv.dev/v1/querybatch"
 OSV_BATCH_SIZE = 1000
-
-
-# ---------------------------------------------------------------------------
-# Manifest parsers — each returns (package_name, version) pairs
-# ---------------------------------------------------------------------------
-
-
-def _parse_requirements_txt(path: Path) -> list[tuple[str, str]]:
-    deps: list[tuple[str, str]] = []
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or line.startswith("-"):
-            continue
-        match = re.match(r"^([A-Za-z0-9_.-]+)\s*==\s*([^\s;#]+)", line)
-        if match:
-            deps.append((match.group(1), match.group(2)))
-    return deps
-
-
-def _parse_pyproject_toml(path: Path) -> list[tuple[str, str]]:
-    deps: list[tuple[str, str]] = []
-    text = path.read_text(encoding="utf-8", errors="replace")
-    in_deps = False
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped in ("dependencies = [", "dependencies= ["):
-            in_deps = True
-            continue
-        if re.match(r"^\[?(dependencies)\]?\s*=\s*\[", stripped):
-            in_deps = True
-            continue
-        if in_deps:
-            if stripped.startswith("]"):
-                in_deps = False
-                continue
-            match = re.match(
-                r"""["']([A-Za-z0-9_.-]+)\s*([><=!~]+\s*[^"',]+)?["']""", stripped
-            )
-            if match:
-                name = match.group(1)
-                version_spec = (match.group(2) or "").strip()
-                pinned = re.match(r"==\s*(.+)", version_spec)
-                if pinned:
-                    deps.append((name, pinned.group(1).strip()))
-    return deps
-
-
-def _parse_package_json(path: Path) -> list[tuple[str, str]]:
-    deps: list[tuple[str, str]] = []
-    try:
-        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-    except (json.JSONDecodeError, OSError):
-        return deps
-    for section in ("dependencies", "devDependencies"):
-        for name, version in data.get(section, {}).items():
-            clean = re.sub(r"^[~^>=<]*", "", version).strip()
-            if clean:
-                deps.append((name, clean))
-    return deps
-
-
-def _parse_package_lock_json(path: Path) -> list[tuple[str, str]]:
-    deps: list[tuple[str, str]] = []
-    try:
-        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
-    except (json.JSONDecodeError, OSError):
-        return deps
-    packages = data.get("packages", {})
-    if packages:
-        for key, info in packages.items():
-            if not key:
-                continue
-            name = key.split("node_modules/")[-1]
-            version = info.get("version", "")
-            if name and version:
-                deps.append((name, version))
-    else:
-        for name, info in data.get("dependencies", {}).items():
-            version = info.get("version", "")
-            if version:
-                deps.append((name, version))
-    return deps
-
-
-MANIFEST_PARSERS: dict[str, tuple[str, object]] = {
-    "requirements.txt": ("PyPI", _parse_requirements_txt),
-    "pyproject.toml": ("PyPI", _parse_pyproject_toml),
-    "package.json": ("npm", _parse_package_json),
-    "package-lock.json": ("npm", _parse_package_lock_json),
-}
-
-
-# ---------------------------------------------------------------------------
-# Ecosystem detection
-# ---------------------------------------------------------------------------
-
-
-_SKIP_DIRS = {"node_modules", ".git", "__pycache__", ".venv", "venv", "vendor", ".tox"}
-
-
-def _detect_ecosystems(repo_path: str) -> dict[str, list[tuple[str, str]]]:
-    """Recursively find known manifests and parse them."""
-    import os
-
-    results: dict[str, list[tuple[str, str]]] = {}
-    for dirpath, dirnames, filenames in os.walk(repo_path):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
-        for filename in filenames:
-            if filename not in MANIFEST_PARSERS:
-                continue
-            ecosystem, parser = MANIFEST_PARSERS[filename]
-            manifest = Path(dirpath) / filename
-            parsed = parser(manifest)  # type: ignore[operator]
-            if parsed:
-                results.setdefault(ecosystem, []).extend(parsed)
-    return results
 
 
 # ---------------------------------------------------------------------------
@@ -302,7 +184,7 @@ class CVEScanner(BaseRepoScanner):
     async def scan(self, repo_path: str, config: RepoScanConfig) -> ScanResult:
         started = datetime.now(UTC)
         try:
-            ecosystems = _detect_ecosystems(repo_path)
+            ecosystems = detect_ecosystems(repo_path)
             if not ecosystems:
                 log.info("[cve] no supported manifest files found")
                 return ScanResult(
