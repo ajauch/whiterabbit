@@ -125,6 +125,39 @@ class TestParseFinding:
         assert finding is not None
         assert finding.category == "misconfig"
 
+    def test_secret_category(self) -> None:
+        line = json.dumps(
+            {
+                "template-id": "aws-key-exposed",
+                "info": {
+                    "name": "AWS Access Key Exposed",
+                    "severity": "high",
+                    "tags": ["token", "secret", "exposure"],
+                },
+                "matched-at": "https://example.com/config.js",
+            }
+        )
+        finding = _parse_finding(line)
+        assert finding is not None
+        assert finding.category == "secret"
+        assert finding.severity == Severity.HIGH
+
+    def test_token_only_category(self) -> None:
+        line = json.dumps(
+            {
+                "template-id": "api-key-leak",
+                "info": {
+                    "name": "API Key in Response",
+                    "severity": "medium",
+                    "tags": ["token"],
+                },
+                "matched-at": "https://example.com/api/config",
+            }
+        )
+        finding = _parse_finding(line)
+        assert finding is not None
+        assert finding.category == "secret"
+
     def test_invalid_json(self) -> None:
         assert _parse_finding("not json") is None
 

@@ -1,4 +1,4 @@
-"""Nuclei scanner — passive templates only (misconfig, exposure, tech detection)."""
+"""Nuclei scanner — passive templates (misconfig, exposure, secrets, tech detection)."""
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ EXCLUDED_TAGS = frozenset(
     }
 )
 
-DEFAULT_TAGS = ["exposure", "misconfig", "tech"]
+DEFAULT_TAGS = ["exposure", "misconfig", "tech", "token", "secret"]
 
 SEVERITY_MAP: dict[str, Severity] = {
     "critical": Severity.CRITICAL,
@@ -104,7 +104,9 @@ def _parse_finding(line: str) -> Finding | None:
     )
 
     category = "nuclei"
-    if any(t in tags for t in ("exposure", "exposed")):
+    if any(t in tags for t in ("token", "secret")):
+        category = "secret"
+    elif any(t in tags for t in ("exposure", "exposed")):
         category = "exposure"
     elif "misconfig" in tags:
         category = "misconfig"
@@ -128,9 +130,7 @@ def _parse_finding(line: str) -> Finding | None:
 class NucleiScanner(BaseScanner):
     name = "nuclei"
     display_name = "Nuclei Scanner"
-    description = (
-        "Detects misconfigurations and exposures using Nuclei (passive templates only)"
-    )
+    description = "Detects misconfigurations, exposed secrets, and exposures using Nuclei (passive templates only)"
     required_binaries: ClassVar[list[str]] = ["nuclei"]
 
     async def scan(self, target: str, config: ScanConfig) -> ScanResult:
