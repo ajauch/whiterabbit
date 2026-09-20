@@ -158,9 +158,10 @@ whiterabbit check-repo-deps
 | `trivy` | Dependency CVEs across 15+ ecosystems, IaC misconfigurations, and license compliance | [Trivy](https://aquasecurity.github.io/trivy/latest/getting-started/installation/) |
 | `secret` | Committed secrets and credentials detection with verification | [TruffleHog](https://github.com/trufflesecurity/trufflehog#installation) |
 | `bandit` | Python-specific security linting (hardcoded passwords, unsafe deserialization, weak crypto, etc.) | [Bandit](https://bandit.readthedocs.io/) |
-| `slopsquat` | Detects hallucinated or non-existent packages in dependency manifests by checking PyPI and npm registries. Flags packages that don't exist (HIGH) and suspiciously new packages created within the last 7 days (LOW). | None (pure Python) |
-| `pinning` | Detects unpinned or loosely pinned dependencies that create supply-chain risk. Flags bare names and `*`/`latest` (HIGH), loose constraints like `>=`, `^`, `~` (MEDIUM), and missing lockfiles (MEDIUM). Parses `requirements.txt`, `pyproject.toml`, and `package.json`. | None (pure Python) |
+| `slopsquat` | Detects hallucinated and slopsquatted packages in dependency manifests. Checks PyPI and npm registries and scores existing packages against 8 threat signals (description, author, source repo, license, release count, age, downloads, classifiers). Non-existent packages are CRITICAL; existing packages are scored from MEDIUM to CRITICAL based on signal count. | None (pure Python) |
+| `pinning` | Detects unpinned or loosely pinned dependencies that create supply-chain risk. Flags bare names and `*`/`latest` (HIGH), loose constraints like `>=`, `^`, `~` (LOW), and missing lockfiles (MEDIUM). Parses `requirements.txt`, `pyproject.toml`, and `package.json`. | None (pure Python) |
 | `logleak` | Detects logging statements that may expose sensitive data — passwords, API keys, tokens, PII, and full request bodies. Distinguishes variable references from string literals to minimize false positives. Supports Python, JS/TS, Java, Go, Ruby, and PHP. CWE-532. | None (pure Python) |
+| `malware` | Flags dependencies that appear in the [DataDog malicious-software-packages-dataset](https://github.com/DataDog/malicious-software-packages-dataset) or have OSSF `MAL-` advisories via [OSV.dev](https://osv.dev/). Checks PyPI and npm packages; fetches both sources fresh at scan time. | None (pure Python) |
 
 ## Architecture
 
@@ -191,6 +192,7 @@ CLI (cli.py)
              ├─ SecretScanner     → ScanResult
              ├─ BanditScanner     → ScanResult
              ├─ SlopsquatScanner  → ScanResult
+             ├─ MalwareScanner   → ScanResult
              ├─ PinningScanner    → ScanResult
              └─ LogLeakScanner    → ScanResult
                      │
