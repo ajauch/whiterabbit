@@ -127,7 +127,7 @@ def _extract_version_from_content(
 def _check_hash(content: str, hashes: dict[str, str]) -> str | None:
     if not hashes:
         return None
-    sha1 = hashlib.sha1(content.encode()).hexdigest()
+    sha1 = hashlib.sha1(content.encode()).hexdigest()  # nosec B324 — not cryptographic; matching RetireJS DB lookup keys
     return hashes.get(sha1)
 
 
@@ -240,11 +240,10 @@ class RetireJSScanner(BaseScanner):
         try:
             vuln_db = await _fetch_vuln_db()
 
-            # verify=False: needed to scan targets with misconfigured TLS.
             async with httpx.AsyncClient(
                 follow_redirects=True,
                 timeout=httpx.Timeout(config.timeout),
-                verify=False,
+                verify=False,  # nosec B501 — scanner must connect to TLS-misconfigured targets
             ) as client:
                 response = await client.get(url)
                 html = response.text

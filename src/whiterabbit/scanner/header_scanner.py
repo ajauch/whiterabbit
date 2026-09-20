@@ -29,11 +29,10 @@ class HeaderScanner(BaseScanner):
         findings: list[Finding] = []
 
         try:
-            # verify=False: intentional — a security scanner must connect to misconfigured hosts
             async with httpx.AsyncClient(
                 follow_redirects=True,
                 timeout=httpx.Timeout(config.timeout),
-                verify=False,
+                verify=False,  # nosec B501 — scanner must connect to TLS-misconfigured targets
             ) as client:
                 response = await client.get(url)
                 headers = response.headers
