@@ -1,6 +1,12 @@
-# WhiteRabbit
+<p align="center">
+  <img src="assets/brand/wordmark.svg" alt="WhiteRabbit" width="480">
+</p>
 
-[![CI](https://github.com/ajauch/whiterabbit/actions/workflows/ci.yml/badge.svg)](https://github.com/ajauch/whiterabbit/actions/workflows/ci.yml)
+<p align="center">
+  <a href="https://github.com/ajauch/whiterabbit/actions/workflows/ci.yml">
+    <img src="https://github.com/ajauch/whiterabbit/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
+</p>
 
 **Grade the security posture of a web application — deployed or in source — in one command.**
 
