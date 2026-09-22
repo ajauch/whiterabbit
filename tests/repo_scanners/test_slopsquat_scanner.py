@@ -37,9 +37,9 @@ def _pypi_json(
     author: str | None = "Test Author",
     description: str = "A legitimate test package with a full description.",
     license_val: str = "MIT",
-    project_urls: dict | None | object = _UNSET,
+    project_urls: dict | object | None = _UNSET,
     releases: dict | None = None,
-    classifiers: list | None | object = _UNSET,
+    classifiers: list | object | None = _UNSET,
 ) -> dict:
     if project_urls is _UNSET:
         project_urls = {"Source": "https://github.com/test/test"}
