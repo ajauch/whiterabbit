@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import logging
+import re
 import threading
 from pathlib import Path
 from typing import Annotated
@@ -315,6 +316,13 @@ def check_deps() -> None:
 # ---------------------------------------------------------------------------
 
 
+_LOCAL_PATH_RE = re.compile(r"^(?:[A-Za-z]:[/\\]|[/\\]|\.\.?[/\\])")
+
+
+def _looks_like_local_path(target: str) -> bool:
+    return bool(_LOCAL_PATH_RE.match(target))
+
+
 @app.command("scanrepo")
 def scanrepo(
     target: Annotated[
@@ -355,6 +363,7 @@ def scanrepo(
     if no_color:
         console.no_color = True
 
+    target = target.strip().strip('"').strip("'")
     is_local = Path(target).is_dir()
 
     if not is_local:
@@ -408,6 +417,10 @@ def scanrepo(
         )
 
     display_target = target
+
+    if not is_local and _looks_like_local_path(target):
+        console.print(f"[red]Directory not found: {target}[/red]")
+        raise typer.Exit(1)
 
     if is_local:
         repo_path = str(Path(target).resolve())
