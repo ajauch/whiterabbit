@@ -17,6 +17,15 @@ SEVERITY_COLORS: dict[Severity, str] = {
     Severity.INFO: "dim",
 }
 
+
+def _format_bytes(n: int) -> str:
+    for unit in ("B", "KB", "MB", "GB"):
+        if abs(n) < 1024:
+            return f"{n:,.0f} {unit}" if unit == "B" else f"{n:,.1f} {unit}"
+        n /= 1024  # type: ignore[assignment]
+    return f"{n:,.1f} TB"
+
+
 GRADE_COLORS: dict[str, str] = {
     "A+": "bold green",
     "A": "green",
@@ -49,6 +58,22 @@ def format_terminal(report: ScanReport, console: Console | None = None) -> None:
         (f"v{report.whiterabbit_version}", "dim"),
     )
     console.print(Panel(header, title="WhiteRabbit Scan Report", border_style="blue"))
+
+    if report.languages:
+        lang_table = Table(title="Languages Detected", show_header=True)
+        lang_table.add_column("Language", style="bold")
+        lang_table.add_column("Bytes", justify="right")
+        lang_table.add_column("", width=20)
+
+        total_bytes = sum(report.languages.values())
+        for lang, byte_count in report.languages.items():
+            pct = byte_count / total_bytes * 100 if total_bytes else 0
+            bar_width = int(pct / 5)
+            bar = "█" * bar_width
+            lang_table.add_row(
+                lang, _format_bytes(byte_count), f"[cyan]{bar}[/cyan] {pct:.1f}%"
+            )
+        console.print(lang_table)
 
     summary_table = Table(title="Summary by Severity", show_header=True)
     summary_table.add_column("Severity", style="bold")

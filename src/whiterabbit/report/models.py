@@ -55,3 +55,4 @@ class ScanReport(BaseModel):
     summary: dict[Severity, int]
     results: list[ScanResult] = Field(default_factory=list)
     whiterabbit_version: str
+    languages: dict[str, int] | None = None

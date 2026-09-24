@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from whiterabbit import __version__
+from whiterabbit.languages import detect_languages
 from whiterabbit.report.grader import compute_grade
 from whiterabbit.report.models import Finding, ScanReport, ScanResult, Severity
 
@@ -141,6 +142,8 @@ class RepoScanRunner:
         for r in errors:
             log.warning("  scanner %s failed: %s", r.scanner_name, r.error)
 
+        languages = detect_languages(repo_path)
+
         return ScanReport(
             target=target,
             scan_date=scan_start,
@@ -149,4 +152,5 @@ class RepoScanRunner:
             summary=summary,
             results=results,
             whiterabbit_version=__version__,
+            languages=languages or None,
         )

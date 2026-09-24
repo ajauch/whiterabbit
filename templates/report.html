@@ -143,6 +143,14 @@ tr.hidden { display: none; }
 footer { text-align: center; margin-top: 3rem; padding-top: 1.5rem;
          border-top: 1px solid var(--card-border); color: var(--fg-muted); font-size: 0.82rem; }
 
+/* Language bars */
+.lang-bars { margin: 0.75rem 0 1rem; }
+.lang-row { display: flex; align-items: center; gap: 0.6rem; margin: 0.35rem 0; }
+.lang-name { font-weight: 600; font-size: 0.88rem; min-width: 110px; text-align: right; }
+.lang-bar-track { flex: 1; height: 14px; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 4px; overflow: hidden; }
+.lang-bar-fill { height: 100%; background: var(--link); border-radius: 3px; min-width: 2px; }
+.lang-pct { font-size: 0.82rem; color: var(--fg-muted); min-width: 50px; }
+
 /* Print */
 @media print {
   body { padding: 0; max-width: none; }
@@ -180,6 +188,23 @@ footer { text-align: center; margin-top: 3rem; padding-top: 1.5rem;
   </div>
   {% endfor %}
 </div>
+
+{% if report.languages %}
+<h2>Languages</h2>
+{% set total_bytes = report.languages.values() | sum %}
+<div class="lang-bars">
+  {% for lang, bytes in report.languages.items() %}
+  {% set pct = (bytes / total_bytes * 100) if total_bytes else 0 %}
+  <div class="lang-row">
+    <span class="lang-name">{{ lang }}</span>
+    <div class="lang-bar-track">
+      <div class="lang-bar-fill" style="width: {{ "%.1f" | format(pct) }}%"></div>
+    </div>
+    <span class="lang-pct">{{ "%.1f" | format(pct) }}%</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
 
 {% set all_findings = [] %}
 {% for result in report.results %}

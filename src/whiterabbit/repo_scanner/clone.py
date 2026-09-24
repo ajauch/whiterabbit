@@ -21,7 +21,7 @@ async def clone_repo(
     tmp_dir = Path(tempfile.mkdtemp(prefix="whiterabbit_repo_"))
     repo_dir = tmp_dir / "repo"
     try:
-        cmd: list[str] = ["git", "clone"]
+        cmd: list[str] = ["git", "-c", "core.longpaths=true", "clone"]
         if depth and depth > 0:
             cmd.extend(["--depth", str(depth)])
         if branch:
