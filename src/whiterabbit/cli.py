@@ -29,7 +29,7 @@ from whiterabbit.report.models import ScanReport, Severity
 from whiterabbit.runner import ScanRunner
 from whiterabbit.scanner import get_all_scanners
 
-LOG_PATH = Path("whiterabbit.log")
+LOG_PATH = Path(__file__).resolve().parent / "whiterabbit.log"
 CSV_PATH = Path("ScanResults.csv")
 REPO_CSV_PATH = Path("RepoScanResults.csv")
 CSV_HEADERS = ["URL", "Date", "Time", "Grade", "High", "Medium", "Low"]
