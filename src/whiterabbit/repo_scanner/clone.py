@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import shutil
 import tempfile
 from collections.abc import AsyncIterator
@@ -28,10 +29,13 @@ async def clone_repo(
             cmd.extend(["--branch", branch])
         cmd.extend([url, str(repo_dir)])
 
+        env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
+
         proc = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env=env,
         )
         _stdout, stderr = await proc.communicate()
 
