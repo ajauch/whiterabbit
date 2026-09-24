@@ -75,6 +75,9 @@ whiterabbit scan example.com
 # Quick scan (SSL + headers only)
 whiterabbit scan example.com --quick
 
+# Fast scan (skip slow scanners like testssl)
+whiterabbit scan example.com --fast
+
 # Run specific scanners
 whiterabbit scan example.com --scanners ssl,headers
 

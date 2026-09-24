@@ -16,6 +16,7 @@ class BaseScanner(ABC):
     description: str
     required_binaries: ClassVar[list[str]] = []
     min_timeout: int | None = None
+    slow: bool = False
 
     @abstractmethod
     async def scan(self, target: str, config: ScanConfig) -> ScanResult: ...

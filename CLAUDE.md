@@ -11,6 +11,7 @@ pip install -e ".[dev]"
 # Run the web scanner
 whiterabbit scan <target>              # all scanners, terminal output
 whiterabbit scan <target> --quick      # headers + SSL only
+whiterabbit scan <target> --fast       # skip slow scanners (e.g. testssl)
 python -m whiterabbit scan <target>    # alternative entry point
 
 # Run the repo scanner

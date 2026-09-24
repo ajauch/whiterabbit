@@ -50,6 +50,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Branch protection policy documented in README — CI, review, signing, and
   force-push rules.
 
+- Fast scan mode (`--fast`) — skips slow scanners (testssl) for quicker results
+  while still running SSL, headers, nuclei, and retire.js.
+
 ### Changed
 
 - Downgraded loose dependency constraints (`>=`, `^`, `~`) from MEDIUM to

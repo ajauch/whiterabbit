@@ -225,6 +225,7 @@ class TestSSLScanner(BaseScanner):
     display_name = "Deep TLS Scanner"
     description = "Deep TLS/SSL analysis using testssl.sh (complements SSLyze)"
     min_timeout: int | None = 900
+    slow: bool = True
 
     def is_available(self) -> bool:
         if _find_testssl() is None:

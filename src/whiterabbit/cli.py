@@ -150,6 +150,9 @@ def _build_progress_table(
 def scan(
     target: Annotated[str, typer.Argument(help="URL or hostname to scan.")],
     quick: Annotated[bool, typer.Option("--quick", help="Headers + SSL only.")] = False,
+    fast: Annotated[
+        bool, typer.Option("--fast", help="Skip slow scanners (e.g. testssl).")
+    ] = False,
     full: Annotated[
         bool, typer.Option("--full", help="All available scanners.")
     ] = False,
@@ -202,6 +205,8 @@ def scan(
                 raise typer.Exit(1)
     elif quick:
         selected = [n for n in ("ssl", "headers") if n in all_scanners]
+    elif fast:
+        selected = [n for n, cls in all_scanners.items() if not cls().slow]
     elif full:
         selected = list(all_scanners)
     else:
