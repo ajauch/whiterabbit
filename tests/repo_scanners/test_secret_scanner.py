@@ -75,7 +75,7 @@ class TestParseTrufflehogOutput:
         findings = _parse_trufflehog_output(output)
         assert len(findings) == 1
         f = findings[0]
-        assert f.severity == Severity.HIGH
+        assert f.severity == Severity.MEDIUM
         assert f.category == "secret"
         assert f.scanner == "secret"
         assert "AWS" in f.title

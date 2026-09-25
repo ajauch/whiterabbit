@@ -31,6 +31,9 @@ _SKIP_DIRS = {
     "fixtures",
     ".pytest_cache",
     "coverage",
+    "dist",
+    "build",
+    ".next",
 }
 
 _SOURCE_EXTENSIONS = {
@@ -190,6 +193,8 @@ def _find_source_files(repo_path: str) -> Iterator[Path]:
     for dirpath, dirnames, filenames in os.walk(repo_path):
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
         for filename in filenames:
+            if ".min." in filename:
+                continue
             ext = os.path.splitext(filename)[1].lower()
             if ext in _SOURCE_EXTENSIONS:
                 yield Path(dirpath) / filename

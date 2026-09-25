@@ -16,7 +16,29 @@ from whiterabbit.report.models import Finding, ScanResult, Severity
 
 log = logging.getLogger("whiterabbit")
 
-_SKIP_DIRS = {"node_modules", ".git", "__pycache__", ".venv", "venv", "vendor", ".tox"}
+_SKIP_DIRS = {
+    "node_modules",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "vendor",
+    ".tox",
+    "test",
+    "tests",
+    "__tests__",
+    "fixtures",
+    "__fixtures__",
+    "testdata",
+    "test_data",
+    "testfixtures",
+    "mocks",
+    "mock",
+    "examples",
+    "example",
+    "spec",
+    "specs",
+}
 
 _LOCKFILE_NAMES: dict[str, list[str]] = {
     "package.json": ["package-lock.json", "yarn.lock", "pnpm-lock.yaml"],

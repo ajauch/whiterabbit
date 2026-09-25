@@ -60,7 +60,7 @@ def _parse_trufflehog_output(raw: str) -> list[Finding]:
             continue
         seen.add(dedup_key)
 
-        severity = Severity.CRITICAL if verified else Severity.HIGH
+        severity = Severity.CRITICAL if verified else Severity.MEDIUM
         status = "verified active" if verified else "unverified"
 
         location = f"{filepath}:{line_num}" if filepath and line_num else filepath

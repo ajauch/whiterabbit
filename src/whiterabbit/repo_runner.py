@@ -22,6 +22,30 @@ log = logging.getLogger("whiterabbit")
 ProgressCallback = Callable[[str, str], None]
 
 
+def _deduplicate_findings(findings: list[Finding]) -> list[Finding]:
+    """Collapse identical findings across different file paths."""
+    groups: dict[str, list[Finding]] = {}
+    for f in findings:
+        raw = f.raw or {}
+        key = f"{f.scanner}|{f.category}|{raw.get('matched', '')}|{f.description}"
+        groups.setdefault(key, []).append(f)
+
+    deduped: list[Finding] = []
+    for group in groups.values():
+        keep = group[0]
+        if len(group) > 1:
+            other_files = []
+            for f in group[1:]:
+                r = f.raw or {}
+                other_files.append(str(r.get("file", f.title)))
+            suffix = f" (also in {len(group) - 1} other file(s): {', '.join(other_files[:5])})"
+            keep = keep.model_copy(
+                update={"description": (keep.description + suffix)[:500]}
+            )
+        deduped.append(keep)
+    return deduped
+
+
 class RepoScanRunner:
     def __init__(self, on_progress: ProgressCallback | None = None) -> None:
         self._on_progress = on_progress
@@ -123,6 +147,8 @@ class RepoScanRunner:
         all_findings: list[Finding] = []
         for r in results:
             all_findings.extend(r.findings)
+
+        all_findings = _deduplicate_findings(all_findings)
 
         grade = compute_grade(all_findings)
         summary: dict[Severity, int] = {s: 0 for s in Severity}
