@@ -41,7 +41,7 @@ _EXACT_NPM_VERSION_RE = re.compile(r"^\d+(?:\.\d+)*(?:-[\w.]+)?(?:\+[\w.]+)?$")
 def _classify_specifier(specifier: str) -> Severity | None:
     stripped = specifier.strip()
     if not stripped or stripped in ("*", "latest", "x", "X"):
-        return Severity.HIGH
+        return Severity.MEDIUM
     if stripped.startswith("=="):
         return None
     if _EXACT_NPM_VERSION_RE.match(stripped):
@@ -204,63 +204,130 @@ def _check_missing_lockfiles(
 # Finding conversion
 # ---------------------------------------------------------------------------
 
+_CONSOLIDATION_MIN = 3
+
+
+def _is_unpinned(specifier: str) -> bool:
+    stripped = specifier.strip()
+    return not stripped or stripped in ("*", "latest", "x", "X")
+
+
+def _remediation_for(dep: DepSpec) -> str:
+    if dep.manifest.endswith("package.json"):
+        return (
+            f"Pin {dep.name} to an exact version in package.json "
+            f"and ensure a lockfile is committed."
+        )
+    if dep.manifest.endswith("pyproject.toml"):
+        return f'Pin {dep.name} to an exact version: "{dep.name}==<version>"'
+    return f"Pin {dep.name} to an exact version: {dep.name}==<version>"
+
 
 def _deps_to_findings(deps: list[DepSpec]) -> list[Finding]:
     findings: list[Finding] = []
     seen: set[str] = set()
+
+    by_manifest: dict[str, list[DepSpec]] = {}
     for dep in deps:
-        severity = _classify_specifier(dep.specifier)
-        if severity is None:
-            continue
-        dedup_key = f"{dep.name}|{dep.manifest}"
-        if dedup_key in seen:
-            continue
-        seen.add(dedup_key)
+        by_manifest.setdefault(dep.manifest, []).append(dep)
 
-        if severity == Severity.HIGH:
-            title = f"Unpinned dependency: {dep.name} in {dep.manifest}"
-            desc_detail = dep.specifier if dep.specifier else "bare name"
-            description = (
-                f"{dep.name} has no version constraint ({desc_detail}). "
-                f"Without pinning, any version — including compromised ones — "
-                f"can be installed."
+    for manifest, manifest_deps in by_manifest.items():
+        unpinned: list[DepSpec] = []
+        loose: list[DepSpec] = []
+
+        for dep in manifest_deps:
+            severity = _classify_specifier(dep.specifier)
+            if severity is None:
+                continue
+            dedup_key = f"{dep.name}|{dep.manifest}"
+            if dedup_key in seen:
+                continue
+            seen.add(dedup_key)
+
+            if _is_unpinned(dep.specifier):
+                unpinned.append(dep)
+            else:
+                loose.append(dep)
+
+        total = len(manifest_deps)
+        consolidate = len(unpinned) >= _CONSOLIDATION_MIN and len(unpinned) > total / 2
+
+        if consolidate:
+            names = ", ".join(d.name for d in unpinned)
+            findings.append(
+                Finding(
+                    severity=Severity.MEDIUM,
+                    title=(
+                        f"{len(unpinned)} of {total} dependencies "
+                        f"unpinned in {manifest}"
+                    ),
+                    description=(
+                        f"{len(unpinned)} dependencies in {manifest} have no "
+                        f"version constraints: {names}. Without pinning, any "
+                        f"version — including compromised ones — can be installed."
+                    )[:500],
+                    remediation=(
+                        f"Pin all dependencies in {manifest} to exact versions."
+                    ),
+                    category="unpinned-dependency",
+                    scanner="pinning",
+                    raw={
+                        "packages": [d.name for d in unpinned],
+                        "manifest": manifest,
+                        "count": len(unpinned),
+                        "total": total,
+                    },
+                )
             )
         else:
-            title = (
-                f"Loosely pinned dependency: {dep.name} "
-                f"({dep.specifier}) in {dep.manifest}"
-            )
-            description = (
-                f"{dep.name} uses a loose version constraint ({dep.specifier}). "
-                f"This allows automatic upgrades that may introduce vulnerabilities."
+            for dep in unpinned:
+                desc_detail = dep.specifier if dep.specifier else "bare name"
+                findings.append(
+                    Finding(
+                        severity=Severity.MEDIUM,
+                        title=f"Unpinned dependency: {dep.name} in {dep.manifest}",
+                        description=(
+                            f"{dep.name} has no version constraint ({desc_detail}). "
+                            f"Without pinning, any version — including compromised "
+                            f"ones — can be installed."
+                        ),
+                        remediation=_remediation_for(dep),
+                        category="unpinned-dependency",
+                        scanner="pinning",
+                        raw={
+                            "package": dep.name,
+                            "specifier": dep.specifier,
+                            "manifest": dep.manifest,
+                            "line": dep.line_number,
+                        },
+                    )
+                )
+
+        for dep in loose:
+            findings.append(
+                Finding(
+                    severity=_classify_specifier(dep.specifier) or Severity.LOW,
+                    title=(
+                        f"Loosely pinned dependency: {dep.name} "
+                        f"({dep.specifier}) in {dep.manifest}"
+                    ),
+                    description=(
+                        f"{dep.name} uses a loose version constraint "
+                        f"({dep.specifier}). This allows automatic upgrades "
+                        f"that may introduce vulnerabilities."
+                    )[:500],
+                    remediation=_remediation_for(dep),
+                    category="unpinned-dependency",
+                    scanner="pinning",
+                    raw={
+                        "package": dep.name,
+                        "specifier": dep.specifier,
+                        "manifest": dep.manifest,
+                        "line": dep.line_number,
+                    },
+                )
             )
 
-        if dep.manifest.endswith("package.json"):
-            remediation = (
-                f"Pin {dep.name} to an exact version in package.json "
-                f"and ensure a lockfile is committed."
-            )
-        elif dep.manifest.endswith("pyproject.toml"):
-            remediation = f'Pin {dep.name} to an exact version: "{dep.name}==<version>"'
-        else:
-            remediation = f"Pin {dep.name} to an exact version: {dep.name}==<version>"
-
-        findings.append(
-            Finding(
-                severity=severity,
-                title=title,
-                description=description[:500],
-                remediation=remediation,
-                category="unpinned-dependency",
-                scanner="pinning",
-                raw={
-                    "package": dep.name,
-                    "specifier": dep.specifier,
-                    "manifest": dep.manifest,
-                    "line": dep.line_number,
-                },
-            )
-        )
     return findings
 
 

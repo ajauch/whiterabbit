@@ -65,7 +65,7 @@ class TestAdjustedSeverity:
         assert _adjusted_severity("HIGH", "HIGH") == Severity.HIGH
 
     def test_high_severity_medium_confidence(self) -> None:
-        assert _adjusted_severity("HIGH", "MEDIUM") == Severity.MEDIUM
+        assert _adjusted_severity("HIGH", "MEDIUM") == Severity.HIGH
 
     def test_medium_severity_high_confidence(self) -> None:
         assert _adjusted_severity("MEDIUM", "HIGH") == Severity.MEDIUM
@@ -73,8 +73,11 @@ class TestAdjustedSeverity:
     def test_low_severity_high_confidence(self) -> None:
         assert _adjusted_severity("LOW", "HIGH") == Severity.LOW
 
-    def test_does_not_go_below_info(self) -> None:
-        assert _adjusted_severity("LOW", "LOW") == Severity.INFO
+    def test_severity_not_affected_by_confidence(self) -> None:
+        assert _adjusted_severity("LOW", "LOW") == Severity.LOW
+
+    def test_medium_severity_medium_confidence(self) -> None:
+        assert _adjusted_severity("MEDIUM", "MEDIUM") == Severity.MEDIUM
 
 
 class TestBuildCommand:

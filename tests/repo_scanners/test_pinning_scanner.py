@@ -26,18 +26,18 @@ from whiterabbit.report.models import Severity
 
 
 class TestClassifySpecifier:
-    def test_empty_string_is_high(self) -> None:
-        assert _classify_specifier("") is Severity.HIGH
+    def test_empty_string_is_medium(self) -> None:
+        assert _classify_specifier("") is Severity.MEDIUM
 
-    def test_star_is_high(self) -> None:
-        assert _classify_specifier("*") is Severity.HIGH
+    def test_star_is_medium(self) -> None:
+        assert _classify_specifier("*") is Severity.MEDIUM
 
-    def test_latest_is_high(self) -> None:
-        assert _classify_specifier("latest") is Severity.HIGH
+    def test_latest_is_medium(self) -> None:
+        assert _classify_specifier("latest") is Severity.MEDIUM
 
-    def test_x_is_high(self) -> None:
-        assert _classify_specifier("x") is Severity.HIGH
-        assert _classify_specifier("X") is Severity.HIGH
+    def test_x_is_medium(self) -> None:
+        assert _classify_specifier("x") is Severity.MEDIUM
+        assert _classify_specifier("X") is Severity.MEDIUM
 
     def test_exact_pin_python_is_none(self) -> None:
         assert _classify_specifier("==2.31.0") is None
@@ -78,7 +78,7 @@ class TestClassifySpecifier:
     def test_whitespace_stripped(self) -> None:
         assert _classify_specifier("  ==2.0  ") is None
         assert _classify_specifier("  >=2.0  ") is Severity.LOW
-        assert _classify_specifier("   ") is Severity.HIGH
+        assert _classify_specifier("   ") is Severity.MEDIUM
 
 
 # ---------------------------------------------------------------------------
@@ -318,11 +318,11 @@ class TestCheckMissingLockfiles:
 
 
 class TestDepsToFindings:
-    def test_unpinned_creates_high(self) -> None:
+    def test_unpinned_creates_medium(self) -> None:
         deps = [DepSpec("requests", "", "requirements.txt", 1)]
         findings = _deps_to_findings(deps)
         assert len(findings) == 1
-        assert findings[0].severity == Severity.HIGH
+        assert findings[0].severity == Severity.MEDIUM
         assert "Unpinned" in findings[0].title
 
     def test_loose_pin_creates_low(self) -> None:
@@ -433,7 +433,7 @@ class TestPinningScanner:
         assert result.error is None
         assert len(result.findings) == 2
         severities = {f.severity for f in result.findings}
-        assert Severity.HIGH in severities
+        assert Severity.MEDIUM in severities
         assert Severity.LOW in severities
 
     def test_package_json_with_loose_pins(self, tmp_path: Path) -> None:
@@ -484,6 +484,27 @@ class TestPinningScanner:
         result = asyncio.run(scanner.scan(str(tmp_path), config))
         assert result.error is None
         assert len(result.findings) >= 3
+
+    def test_consolidation_when_majority_unpinned(self, tmp_path: Path) -> None:
+        req = tmp_path / "requirements.txt"
+        req.write_text("requests\nflask\nclick\nuvicorn\n")
+        scanner = PinningScanner()
+        config = RepoScanConfig()
+        result = asyncio.run(scanner.scan(str(tmp_path), config))
+        assert result.error is None
+        assert len(result.findings) == 1
+        assert "4 of 4" in result.findings[0].title
+        assert result.findings[0].severity == Severity.MEDIUM
+
+    def test_no_consolidation_below_threshold(self, tmp_path: Path) -> None:
+        req = tmp_path / "requirements.txt"
+        req.write_text("requests\nflask==3.0.0\nclick==8.0\n")
+        scanner = PinningScanner()
+        config = RepoScanConfig()
+        result = asyncio.run(scanner.scan(str(tmp_path), config))
+        assert result.error is None
+        unpinned = [f for f in result.findings if "Unpinned" in f.title]
+        assert len(unpinned) == 1
 
     def test_scanner_metadata(self) -> None:
         scanner = PinningScanner()

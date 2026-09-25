@@ -21,20 +21,6 @@ BANDIT_SEVERITY_MAP: dict[str, Severity] = {
     "LOW": Severity.LOW,
 }
 
-CONFIDENCE_BOOST: dict[str, int] = {
-    "HIGH": 0,
-    "MEDIUM": 1,
-    "LOW": 2,
-}
-
-SEVERITY_ORDER = [
-    Severity.INFO,
-    Severity.LOW,
-    Severity.MEDIUM,
-    Severity.HIGH,
-    Severity.CRITICAL,
-]
-
 
 _EXCLUDED_DIRS = "tests,test,.tox,.eggs"
 
@@ -62,11 +48,7 @@ def _build_command(repo_path: str) -> list[str]:
 
 
 def _adjusted_severity(severity: str, confidence: str) -> Severity:
-    base = BANDIT_SEVERITY_MAP.get(severity, Severity.MEDIUM)
-    downgrade = CONFIDENCE_BOOST.get(confidence, 0)
-    idx = SEVERITY_ORDER.index(base)
-    adjusted_idx = max(0, idx - downgrade)
-    return SEVERITY_ORDER[adjusted_idx]
+    return BANDIT_SEVERITY_MAP.get(severity, Severity.MEDIUM)
 
 
 def _parse_bandit_output(raw: str) -> list[Finding]:
