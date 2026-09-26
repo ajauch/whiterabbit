@@ -263,12 +263,16 @@ class TestSSLScanner(BaseScanner):
                 error="testssl.sh not found. Install: https://github.com/drwetter/testssl.sh#install",
             )
 
-        use_tempfile = sys.platform == "win32" and not shutil.which("testssl.sh")
-        json_tmpfile = None
+        fd, json_tmpfile = tempfile.mkstemp(suffix=".json", prefix="testssl_")
+        os.close(fd)
 
-        if use_tempfile:
+        use_git_bash = sys.platform == "win32" and not shutil.which("testssl.sh")
+
+        if use_git_bash:
             bash = _find_git_bash()
             if not bash:
+                with contextlib.suppress(OSError):
+                    os.unlink(json_tmpfile)
                 return ScanResult(
                     target=target,
                     scanner_name=self.name,
@@ -280,14 +284,12 @@ class TestSSLScanner(BaseScanner):
             if len(script_posix) >= 2 and script_posix[1] == ":":
                 script_posix = "/" + script_posix[0].lower() + script_posix[2:]
             testssl_dir = script_posix.rsplit("/", 1)[0]
-            fd, json_tmpfile = tempfile.mkstemp(suffix=".json", prefix="testssl_")
-            os.close(fd)
             json_tmpfile_posix = json_tmpfile.replace("\\", "/")
             if len(json_tmpfile_posix) >= 2 and json_tmpfile_posix[1] == ":":
                 json_tmpfile_posix = (
                     "/" + json_tmpfile_posix[0].lower() + json_tmpfile_posix[2:]
                 )
-            cmd = [
+            cmd: list[str] = [
                 bash,
                 "-c",
                 f"export PATH='{testssl_dir}':$PATH; '{script_posix}' --jsonfile '{json_tmpfile_posix}' -U --quiet --color 0 --fast --warnings off '{url}'",
@@ -296,7 +298,7 @@ class TestSSLScanner(BaseScanner):
             cmd = [
                 testssl_path,
                 "--jsonfile",
-                "-",
+                json_tmpfile,
                 "-U",
                 "--quiet",
                 "--color",
@@ -314,19 +316,16 @@ class TestSSLScanner(BaseScanner):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(
+            _stdout, stderr = await asyncio.wait_for(
                 proc.communicate(),
                 timeout=testssl_timeout,
             )
 
-            if use_tempfile and json_tmpfile:
-                try:
-                    with open(json_tmpfile, encoding="utf-8", errors="replace") as f:
-                        output = f.read().strip()
-                except FileNotFoundError:
-                    output = ""
-            else:
-                output = stdout.decode(errors="replace").strip()
+            try:
+                with open(json_tmpfile, encoding="utf-8", errors="replace") as f:
+                    output = f.read().strip()
+            except FileNotFoundError:
+                output = ""
 
             if not output and proc.returncode not in (0, 1):
                 error_msg = stderr.decode(errors="replace").strip()
@@ -386,9 +385,8 @@ class TestSSLScanner(BaseScanner):
                 error=str(exc),
             )
         finally:
-            if json_tmpfile:
-                with contextlib.suppress(OSError):
-                    os.unlink(json_tmpfile)
+            with contextlib.suppress(OSError):
+                os.unlink(json_tmpfile)
 
         return ScanResult(
             target=target,

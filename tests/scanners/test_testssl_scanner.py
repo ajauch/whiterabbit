@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
+import tempfile
 from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 
@@ -17,7 +19,7 @@ from whiterabbit.scanner.testssl_scanner import (
 
 
 def _force_direct_path(stack: ExitStack) -> None:
-    """Force the non-Windows (stdout-based) code path and ensure testssl.sh appears available."""
+    """Force the non-Windows code path and ensure testssl.sh appears available."""
     stack.enter_context(
         patch(
             "whiterabbit.scanner.testssl_scanner._find_testssl",
@@ -32,6 +34,19 @@ def _force_direct_path(stack: ExitStack) -> None:
     )
     stack.enter_context(
         patch("whiterabbit.scanner.testssl_scanner.sys.platform", "linux")
+    )
+
+
+def _setup_tmpfile(stack: ExitStack, content: bytes = b"") -> None:
+    """Create a real temp file with optional content and patch mkstemp to return it."""
+    fd, path = tempfile.mkstemp(suffix=".json", prefix="testssl_test_")
+    if content:
+        os.write(fd, content)
+    stack.enter_context(
+        patch(
+            "whiterabbit.scanner.testssl_scanner.tempfile.mkstemp",
+            return_value=(fd, path),
+        )
     )
 
 
@@ -307,7 +322,7 @@ class TestTestSSLScanner:
         ).encode()
 
         async def mock_communicate() -> tuple[bytes, bytes]:
-            return output, b""
+            return b"", b""
 
         proc_mock = MagicMock()
         proc_mock.communicate = mock_communicate
@@ -315,6 +330,7 @@ class TestTestSSLScanner:
 
         with ExitStack() as stack:
             _force_direct_path(stack)
+            _setup_tmpfile(stack, output)
             stack.enter_context(
                 patch(
                     "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
@@ -339,7 +355,7 @@ class TestTestSSLScanner:
         ).encode()
 
         async def mock_communicate() -> tuple[bytes, bytes]:
-            return output, b""
+            return b"", b""
 
         proc_mock = MagicMock()
         proc_mock.communicate = mock_communicate
@@ -347,6 +363,7 @@ class TestTestSSLScanner:
 
         with ExitStack() as stack:
             _force_direct_path(stack)
+            _setup_tmpfile(stack, output)
             stack.enter_context(
                 patch(
                     "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
@@ -373,7 +390,7 @@ class TestTestSSLScanner:
         ).encode()
 
         async def mock_communicate() -> tuple[bytes, bytes]:
-            return output, b""
+            return b"", b""
 
         proc_mock = MagicMock()
         proc_mock.communicate = mock_communicate
@@ -381,6 +398,7 @@ class TestTestSSLScanner:
 
         with ExitStack() as stack:
             _force_direct_path(stack)
+            _setup_tmpfile(stack, output)
             stack.enter_context(
                 patch(
                     "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
@@ -415,6 +433,7 @@ class TestTestSSLScanner:
 
         with ExitStack() as stack:
             _force_direct_path(stack)
+            _setup_tmpfile(stack)
             stack.enter_context(
                 patch(
                     "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
@@ -470,7 +489,7 @@ class TestTestSSLScanner:
         output = "\n".join(lines).encode()
 
         async def mock_communicate() -> tuple[bytes, bytes]:
-            return output, b""
+            return b"", b""
 
         proc_mock = MagicMock()
         proc_mock.communicate = mock_communicate
@@ -478,6 +497,7 @@ class TestTestSSLScanner:
 
         with ExitStack() as stack:
             _force_direct_path(stack)
+            _setup_tmpfile(stack, output)
             stack.enter_context(
                 patch(
                     "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
@@ -494,7 +514,7 @@ class TestTestSSLScanner:
         output = json.dumps([]).encode()
 
         async def mock_communicate() -> tuple[bytes, bytes]:
-            return output, b""
+            return b"", b""
 
         proc_mock = MagicMock()
         proc_mock.communicate = mock_communicate
@@ -508,6 +528,7 @@ class TestTestSSLScanner:
 
         with ExitStack() as stack:
             _force_direct_path(stack)
+            _setup_tmpfile(stack, output)
             stack.enter_context(
                 patch(
                     "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
@@ -530,6 +551,7 @@ class TestTestSSLScanner:
 
         with ExitStack() as stack:
             _force_direct_path(stack)
+            _setup_tmpfile(stack)
             stack.enter_context(
                 patch(
                     "whiterabbit.scanner.testssl_scanner.asyncio.create_subprocess_exec",
