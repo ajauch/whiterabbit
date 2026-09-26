@@ -138,6 +138,7 @@ tr.hidden { display: none; }
 .scanner-chip .name { font-weight: 600; }
 .scanner-chip .detail { color: var(--fg-muted); font-size: 0.82rem; }
 .scanner-chip.errored { border-color: var(--sev-high); }
+.scanner-chip.unavailable { border-color: var(--sev-medium); opacity: 0.75; }
 
 /* Footer */
 footer { text-align: center; margin-top: 3rem; padding-top: 1.5rem;
@@ -295,6 +296,12 @@ footer { text-align: center; margin-top: 3rem; padding-top: 1.5rem;
         &middot; {{ "%.1f" | format((result.finished_at - result.started_at).total_seconds()) }}s
       {% endif %}
     </div>
+  </div>
+  {% endfor %}
+  {% for u in report.scanners_unavailable %}
+  <div class="scanner-chip unavailable">
+    <div class="name">{{ u.scanner }}</div>
+    <div class="detail">Unavailable: {{ u.reason }}</div>
   </div>
   {% endfor %}
 </div>

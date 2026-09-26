@@ -11,7 +11,13 @@ from rich.console import Console
 
 from whiterabbit.report.formatters.json import format_json, write_json
 from whiterabbit.report.formatters.terminal import format_terminal
-from whiterabbit.report.models import Finding, ScanReport, ScanResult, Severity
+from whiterabbit.report.models import (
+    Finding,
+    ScanReport,
+    ScanResult,
+    Severity,
+    UnavailableScanner,
+)
 
 
 def _report_with_findings() -> ScanReport:
@@ -104,6 +110,19 @@ class TestJSONFormatter:
         assert restored.grade == report.grade
         assert len(restored.results) == len(report.results)
 
+    def test_json_includes_unavailable_scanners(self) -> None:
+        report = _empty_report()
+        report.scanners_unavailable = [
+            UnavailableScanner(scanner="nuclei", reason="'nuclei' not found on PATH"),
+            UnavailableScanner(
+                scanner="testssl", reason="'testssl.sh' not found on PATH"
+            ),
+        ]
+        output = format_json(report)
+        parsed = json.loads(output)
+        assert len(parsed["scanners_unavailable"]) == 2
+        assert parsed["scanners_unavailable"][0]["scanner"] == "nuclei"
+
 
 class TestTerminalFormatter:
     def test_format_with_findings(self) -> None:
@@ -149,6 +168,19 @@ class TestTerminalFormatter:
         output = capture.get()
         assert "broken" in output
         assert "Connection refused" in output
+
+    def test_format_unavailable_scanners(self) -> None:
+        report = _empty_report()
+        report.scanners_unavailable = [
+            UnavailableScanner(scanner="nuclei", reason="'nuclei' not found on PATH"),
+        ]
+        console = Console(file=None, force_terminal=True, width=120)
+        with console.capture() as capture:
+            format_terminal(report, console)
+        output = capture.get()
+        assert "nuclei" in output
+        assert "unavailable" in output.lower()
+        assert "not found on PATH" in output
 
     def test_format_default_console(self) -> None:
         report = _empty_report()

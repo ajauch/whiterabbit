@@ -47,6 +47,11 @@ class ScanResult(BaseModel):
     error: str | None = None
 
 
+class UnavailableScanner(BaseModel):
+    scanner: str
+    reason: str
+
+
 class ScanReport(BaseModel):
     target: str
     scan_date: datetime
@@ -54,5 +59,6 @@ class ScanReport(BaseModel):
     grade: str
     summary: dict[Severity, int]
     results: list[ScanResult] = Field(default_factory=list)
+    scanners_unavailable: list[UnavailableScanner] = Field(default_factory=list)
     whiterabbit_version: str
     languages: dict[str, int] | None = None

@@ -5,7 +5,13 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
-from whiterabbit.report.models import Finding, ScanReport, ScanResult, Severity
+from whiterabbit.report.models import (
+    Finding,
+    ScanReport,
+    ScanResult,
+    Severity,
+    UnavailableScanner,
+)
 
 
 class TestSeverity:
@@ -113,3 +119,56 @@ class TestScanReport:
         assert parsed["target"] == "example.com"
         assert parsed["grade"] == "F"
         assert "results" in parsed
+
+    def test_scanners_unavailable_default_empty(self) -> None:
+        r = ScanReport(
+            target="example.com",
+            scan_date=datetime(2026, 1, 1, tzinfo=UTC),
+            duration_seconds=5.0,
+            grade="A+",
+            summary={s: 0 for s in Severity},
+            results=[],
+            whiterabbit_version="0.1.0",
+        )
+        assert r.scanners_unavailable == []
+
+    def test_scanners_unavailable_in_json(self) -> None:
+        r = ScanReport(
+            target="example.com",
+            scan_date=datetime(2026, 1, 1, tzinfo=UTC),
+            duration_seconds=5.0,
+            grade="A+",
+            summary={s: 0 for s in Severity},
+            results=[],
+            scanners_unavailable=[
+                UnavailableScanner(
+                    scanner="nuclei", reason="'nuclei' not found on PATH"
+                ),
+                UnavailableScanner(
+                    scanner="testssl", reason="'testssl.sh' not found on PATH"
+                ),
+            ],
+            whiterabbit_version="0.1.0",
+        )
+        parsed = json.loads(r.model_dump_json())
+        assert len(parsed["scanners_unavailable"]) == 2
+        assert parsed["scanners_unavailable"][0]["scanner"] == "nuclei"
+        assert "not found on PATH" in parsed["scanners_unavailable"][0]["reason"]
+        assert parsed["scanners_unavailable"][1]["scanner"] == "testssl"
+
+    def test_scanners_unavailable_round_trip(self) -> None:
+        r = ScanReport(
+            target="example.com",
+            scan_date=datetime(2026, 1, 1, tzinfo=UTC),
+            duration_seconds=5.0,
+            grade="A+",
+            summary={s: 0 for s in Severity},
+            results=[],
+            scanners_unavailable=[
+                UnavailableScanner(scanner="nuclei", reason="missing binary"),
+            ],
+            whiterabbit_version="0.1.0",
+        )
+        restored = ScanReport.model_validate_json(r.model_dump_json())
+        assert len(restored.scanners_unavailable) == 1
+        assert restored.scanners_unavailable[0].scanner == "nuclei"

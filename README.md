@@ -213,6 +213,11 @@ Each scanner is a single class implementing `async scan(target, config) -> ScanR
 Repo scanners follow the same contract but take a local directory path instead
 of a URL, and use `RepoScanConfig` instead of `ScanConfig`.
 
+If a scanner is requested but fails the availability check (e.g. binary not on
+PATH), the report records it in a `scanners_unavailable` list with the reason.
+This appears in JSON, HTML, and terminal output so pipeline consumers can
+distinguish "scanner found nothing" from "scanner was never attempted."
+
 For remote repos, `scanrepo` clones into a temporary directory (shallow by
 default) and cleans up automatically after the scan completes.
 

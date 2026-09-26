@@ -118,5 +118,12 @@ def format_terminal(report: ScanReport, console: Console | None = None) -> None:
 
         console.print(findings_table)
 
+    if report.scanners_unavailable:
+        console.print()
+        for u in report.scanners_unavailable:
+            console.print(
+                f"[yellow]Scanner {u.scanner} unavailable:[/yellow] {u.reason}"
+            )
+
     if total_findings == 0:
         console.print("\n[green]No issues found.[/green]")

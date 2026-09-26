@@ -43,7 +43,7 @@ WhiteRabbit is a local web security scanner. Src layout: `src/whiterabbit/`.
 
 **Scanners:** `ssl` (SSLyze library), `headers` (httpx), `nuclei` (subprocess, requires `nuclei` binary), `retirejs` (pure Python, downloads vuln DB), `testssl` (subprocess via Git Bash on Windows, requires `testssl.sh`). The testssl scanner overrides `is_available()`/`check_dependencies()` instead of using `required_binaries`.
 
-**Data models** (`report/models.py`): Pydantic v2. `Severity` enum (critical/high/medium/low/info), `Finding`, `ScanResult`, `ScanReport`.
+**Data models** (`report/models.py`): Pydantic v2. `Severity` enum (critical/high/medium/low/info), `Finding`, `ScanResult`, `UnavailableScanner`, `ScanReport`. `ScanReport.scanners_unavailable` records scanners that were requested but failed the `is_available()` check (binary not on PATH, etc.).
 
 **Grading** (`report/grader.py`): Waterfall — any critical→F, high→D, medium→C, low→B, info-only→A, none→A+.
 

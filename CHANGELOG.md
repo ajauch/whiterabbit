@@ -52,6 +52,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 - Fast scan mode (`--fast`) — skips slow scanners (testssl) for quicker results
   while still running SSL, headers, nuclei, and retire.js.
+- `scanners_unavailable` field in `ScanReport` — records which scanners were
+  requested but failed the availability check (e.g. binary not on PATH), along
+  with the reason. Appears in JSON, HTML, and terminal output so pipeline
+  consumers can distinguish "scanner found nothing" from "scanner was never
+  attempted."
 
 ### Changed
 

@@ -25,7 +25,7 @@ from whiterabbit.repo_scanner.clone import clone_repo
 from whiterabbit.report.formatters.html import write_html
 from whiterabbit.report.formatters.json import format_json, write_json
 from whiterabbit.report.formatters.terminal import format_terminal
-from whiterabbit.report.models import ScanReport, Severity
+from whiterabbit.report.models import ScanReport, Severity, UnavailableScanner
 from whiterabbit.runner import ScanRunner
 from whiterabbit.scanner import get_all_scanners
 
@@ -216,12 +216,15 @@ def scan(
 
     scan_log = logging.getLogger("whiterabbit")
     unavailable = [s for s in scanner_instances if not s.is_available()]
+    unavailable_records: list[UnavailableScanner] = []
     for s in unavailable:
         missing = s.check_dependencies()
-        scan_log.warning("scanner %s unavailable: %s", s.name, "; ".join(missing))
+        reason = "; ".join(missing)
+        scan_log.warning("scanner %s unavailable: %s", s.name, reason)
         console.print(f"[yellow]Scanner {s.display_name} unavailable:[/yellow]")
         for line in missing:
             console.print(f"  {line}")
+        unavailable_records.append(UnavailableScanner(scanner=s.name, reason=reason))
     scanner_instances = [s for s in scanner_instances if s.is_available()]
 
     if not scanner_instances:
@@ -262,6 +265,7 @@ def scan(
             thread.join(timeout=0.12)
 
     assert report_result is not None
+    report_result.scanners_unavailable = unavailable_records
     _output_report(report_result, fmt, output)
 
 
@@ -407,12 +411,17 @@ def scanrepo(
 
     scan_log = logging.getLogger("whiterabbit")
     unavailable = [s for s in scanner_instances if not s.is_available()]
+    unavailable_records_repo: list[UnavailableScanner] = []
     for s in unavailable:
         missing = s.check_dependencies()
-        scan_log.warning("scanner %s unavailable: %s", s.name, "; ".join(missing))
+        reason = "; ".join(missing)
+        scan_log.warning("scanner %s unavailable: %s", s.name, reason)
         console.print(f"[yellow]Scanner {s.display_name} unavailable:[/yellow]")
         for line in missing:
             console.print(f"  {line}")
+        unavailable_records_repo.append(
+            UnavailableScanner(scanner=s.name, reason=reason)
+        )
     scanner_instances = [s for s in scanner_instances if s.is_available()]
 
     if not scanner_instances:
@@ -430,7 +439,13 @@ def scanrepo(
     if is_local:
         repo_path = str(Path(target).resolve())
         _run_repo_scan(
-            display_target, repo_path, scanner_instances, config, fmt, output
+            display_target,
+            repo_path,
+            scanner_instances,
+            config,
+            fmt,
+            output,
+            unavailable_records_repo,
         )
     else:
         console.print(f"[dim]Cloning {target}...[/dim]")
@@ -450,6 +465,7 @@ def scanrepo(
                 )
 
         report = asyncio.run(_clone_and_scan())
+        report.scanners_unavailable = unavailable_records_repo
         _output_report(report, fmt, output, csv_path=REPO_CSV_PATH)
 
 
@@ -460,6 +476,7 @@ def _run_repo_scan(
     config: RepoScanConfig,
     fmt: str,
     output: str | None,
+    unavailable_records: list[UnavailableScanner] | None = None,
 ) -> None:
     scanner_status: dict[str, str] = {
         s.display_name: "pending" for s in scanner_instances
@@ -495,6 +512,8 @@ def _run_repo_scan(
             thread.join(timeout=0.12)
 
     assert report_result is not None
+    if unavailable_records:
+        report_result.scanners_unavailable = unavailable_records
     _output_report(report_result, fmt, output, csv_path=REPO_CSV_PATH)
 
 
