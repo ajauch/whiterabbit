@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from whiterabbit import __version__
 from whiterabbit.config import ScanConfig
 from whiterabbit.report.models import Finding, ScanResult, Severity
 from whiterabbit.runner import ScanRunner
@@ -120,7 +121,7 @@ class TestScanRunner:
     async def test_report_fields(self, config: ScanConfig) -> None:
         runner = ScanRunner()
         report = await runner.run("example.com", [], config)
-        assert report.whiterabbit_version == "0.1.0"
+        assert report.whiterabbit_version == __version__
         assert report.duration_seconds >= 0
         assert report.scan_date is not None
         assert report.summary[Severity.CRITICAL] == 0

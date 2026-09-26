@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from whiterabbit import __version__
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_runner import RepoScanRunner
 from whiterabbit.repo_scanner.base import BaseRepoScanner
@@ -132,7 +133,7 @@ class TestRepoScanRunner:
         report = await runner.run(
             "https://github.com/user/repo", "/tmp/repo", [], config
         )
-        assert report.whiterabbit_version == "0.1.0"
+        assert report.whiterabbit_version == __version__
         assert report.duration_seconds >= 0
         assert report.scan_date is not None
         assert report.summary[Severity.CRITICAL] == 0
