@@ -139,7 +139,8 @@ class NucleiScanner(BaseScanner):
         findings: list[Finding] = []
 
         tags = list(DEFAULT_TAGS)
-        cmd = _build_command(url, tags, config.timeout)
+        nuclei_timeout = max(config.timeout, 900)
+        cmd = _build_command(url, tags, nuclei_timeout)
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -150,7 +151,7 @@ class NucleiScanner(BaseScanner):
             )
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(),
-                timeout=config.timeout + 30,
+                timeout=nuclei_timeout + 30,
             )
 
             if proc.returncode not in (0, 1):
@@ -185,7 +186,7 @@ class NucleiScanner(BaseScanner):
                 scanner_name=self.name,
                 started_at=started,
                 finished_at=datetime.now(UTC),
-                error=f"Nuclei timed out after {config.timeout + 30}s",
+                error=f"Nuclei timed out after {nuclei_timeout + 30}s",
             )
         except Exception as exc:
             return ScanResult(
