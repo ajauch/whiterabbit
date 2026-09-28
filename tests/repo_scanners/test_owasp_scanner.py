@@ -12,6 +12,7 @@ from whiterabbit.repo_scanner.owasp_scanner import (
     _build_command,
     _gha_expr_is_untrusted,
     _has_untrusted_gha_expression,
+    _is_first_party_gha_action,
     _parse_semgrep_output,
 )
 from whiterabbit.report.models import Severity
@@ -353,6 +354,105 @@ class TestParseGHAFiltering:
         )
         findings = _parse_semgrep_output(output)
         assert len(findings) == 0
+
+
+class TestIsFirstPartyGHAAction:
+    """Tests for first-party GitHub Actions detection."""
+
+    def test_actions_checkout(self) -> None:
+        assert _is_first_party_gha_action("- uses: actions/checkout@v4")
+
+    def test_actions_setup_node(self) -> None:
+        assert _is_first_party_gha_action("- uses: actions/setup-node@v4")
+
+    def test_github_codeql(self) -> None:
+        assert _is_first_party_gha_action("- uses: github/codeql-action/init@v3")
+
+    def test_third_party_action(self) -> None:
+        assert not _is_first_party_gha_action("- uses: docker/build-push-action@v5")
+
+    def test_third_party_community(self) -> None:
+        assert not _is_first_party_gha_action("- uses: coverallsapp/github-action@v2")
+
+    def test_no_uses_line(self) -> None:
+        assert not _is_first_party_gha_action("run: echo hello")
+
+    def test_uses_with_extra_whitespace(self) -> None:
+        assert _is_first_party_gha_action("  uses:  actions/checkout@v4")
+
+
+class TestParseMutableActionTag:
+    """Verify _parse_semgrep_output downgrades first-party GHA mutable tag findings."""
+
+    _CHECK_ID = "yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag"
+
+    def _mutable_tag_result(self, lines: str) -> str:
+        return json.dumps(
+            {
+                "results": [
+                    {
+                        "check_id": self._CHECK_ID,
+                        "path": ".github/workflows/ci.yml",
+                        "start": {"line": 14},
+                        "extra": {
+                            "severity": "WARNING",
+                            "message": "GitHub Actions step uses a mutable tag.",
+                            "lines": lines,
+                            "metadata": {
+                                "owasp": [
+                                    "A08:2021 - Software and Data Integrity Failures"
+                                ],
+                            },
+                        },
+                    }
+                ]
+            }
+        )
+
+    def test_first_party_actions_downgraded_to_low(self) -> None:
+        output = self._mutable_tag_result("- uses: actions/checkout@v4")
+        findings = _parse_semgrep_output(output)
+        assert len(findings) == 1
+        assert findings[0].severity == Severity.LOW
+
+    def test_first_party_github_downgraded_to_low(self) -> None:
+        output = self._mutable_tag_result("- uses: github/codeql-action/init@v3")
+        findings = _parse_semgrep_output(output)
+        assert len(findings) == 1
+        assert findings[0].severity == Severity.LOW
+
+    def test_third_party_stays_medium(self) -> None:
+        output = self._mutable_tag_result("- uses: docker/build-push-action@v5")
+        findings = _parse_semgrep_output(output)
+        assert len(findings) == 1
+        assert findings[0].severity == Severity.MEDIUM
+
+    def test_third_party_community_stays_medium(self) -> None:
+        output = self._mutable_tag_result("- uses: coverallsapp/github-action@v2")
+        findings = _parse_semgrep_output(output)
+        assert len(findings) == 1
+        assert findings[0].severity == Severity.MEDIUM
+
+    def test_no_lines_stays_medium(self) -> None:
+        output = json.dumps(
+            {
+                "results": [
+                    {
+                        "check_id": self._CHECK_ID,
+                        "path": ".github/workflows/ci.yml",
+                        "start": {"line": 14},
+                        "extra": {
+                            "severity": "WARNING",
+                            "message": "Mutable tag.",
+                            "metadata": {},
+                        },
+                    }
+                ]
+            }
+        )
+        findings = _parse_semgrep_output(output)
+        assert len(findings) == 1
+        assert findings[0].severity == Severity.MEDIUM
 
 
 class TestOWASPScanner:

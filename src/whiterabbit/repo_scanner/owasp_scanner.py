@@ -63,6 +63,26 @@ _GHA_UNTRUSTED_PREFIXES: tuple[str, ...] = (
 
 _GHA_EXPR_RE = re.compile(r"\$\{\{\s*(.+?)\s*\}\}")
 
+# ---------------------------------------------------------------------------
+# GitHub Actions mutable-tag severity downgrade for first-party actions
+# ---------------------------------------------------------------------------
+# Semgrep flags every `uses: owner/action@tag` as medium, but first-party
+# GitHub actions (actions/*, github/*) carry minimal supply-chain risk —
+# the tag is maintained by GitHub itself.  Downgrade those to low so they
+# don't inflate grades.
+
+_GHA_FIRST_PARTY_OWNERS: frozenset[str] = frozenset({"actions", "github"})
+
+_GHA_USES_RE = re.compile(r"uses:\s*([^/]+)/")
+
+
+def _is_first_party_gha_action(lines: str) -> bool:
+    """Return True if the matched YAML references a first-party GitHub action."""
+    m = _GHA_USES_RE.search(lines)
+    if m:
+        return m.group(1).strip() in _GHA_FIRST_PARTY_OWNERS
+    return False
+
 
 def _gha_expr_is_untrusted(expr: str) -> bool:
     """Check if a single GitHub Actions expression references untrusted input."""
@@ -122,6 +142,11 @@ def _parse_semgrep_output(raw: str) -> list[Finding]:
                 continue
         severity_str = extra.get("severity", "INFO")
         severity = SEMGREP_SEVERITY_MAP.get(severity_str, Severity.LOW)
+
+        if "mutable-action-tag" in check_id:
+            lines = extra.get("lines", "")
+            if lines and _is_first_party_gha_action(lines):
+                severity = Severity.LOW
 
         message = extra.get("message", f"Semgrep rule {check_id} matched.")
         metadata = extra.get("metadata", {})
