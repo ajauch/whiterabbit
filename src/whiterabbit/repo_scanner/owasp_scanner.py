@@ -174,10 +174,12 @@ class OWASPScanner(BaseRepoScanner):
     display_name = "OWASP SAST Scanner"
     description = "Static analysis for OWASP vulnerabilities using Semgrep"
     required_binaries: ClassVar[list[str]] = ["semgrep"]
+    min_timeout: int | None = 600
 
     async def scan(self, repo_path: str, config: RepoScanConfig) -> ScanResult:
         started = datetime.now(UTC)
-        cmd = _build_command(repo_path, config.timeout)
+        semgrep_timeout = max(config.timeout, 600)
+        cmd = _build_command(repo_path, semgrep_timeout)
 
         try:
             proc = await asyncio.create_subprocess_exec(
@@ -188,7 +190,7 @@ class OWASPScanner(BaseRepoScanner):
             )
             stdout, stderr = await asyncio.wait_for(
                 proc.communicate(),
-                timeout=config.timeout + 30,
+                timeout=semgrep_timeout + 30,
             )
 
             if proc.returncode not in (0, 1):
@@ -225,7 +227,7 @@ class OWASPScanner(BaseRepoScanner):
                 scanner_name=self.name,
                 started_at=started,
                 finished_at=datetime.now(UTC),
-                error=f"Semgrep timed out after {config.timeout + 30}s",
+                error=f"Semgrep timed out after {semgrep_timeout + 30}s",
             )
         except Exception as exc:
             return ScanResult(

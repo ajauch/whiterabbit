@@ -356,6 +356,12 @@ class TestParseGHAFiltering:
 
 
 class TestOWASPScanner:
+    def test_min_timeout(self) -> None:
+        scanner = OWASPScanner()
+        config = RepoScanConfig()
+        assert scanner.min_timeout == 600
+        assert scanner.effective_timeout(config) >= 600
+
     def test_is_available_without_semgrep(self) -> None:
         with patch("whiterabbit.repo_scanner.base.resolve_binary", return_value=None):
             scanner = OWASPScanner()
