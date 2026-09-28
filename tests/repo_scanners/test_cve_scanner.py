@@ -10,11 +10,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.cve_scanner import (
     CVEScanner,
+    _adjust_severity_for_dep_context,
     _cvss_to_severity,
+    _dep_context_label,
+    _downgrade_severity,
     _osv_to_findings,
 )
 from whiterabbit.repo_scanner.manifest import (
     detect_ecosystems,
+    detect_ecosystems_rich,
     parse_package_json,
     parse_package_lock_json,
     parse_pyproject_toml,
@@ -322,3 +326,261 @@ class TestCVEScanner:
 
         assert result.error is not None
         assert "OSV API error" in result.error
+
+
+# ---------------------------------------------------------------------------
+# Severity adjustment tests
+# ---------------------------------------------------------------------------
+
+
+class TestDowngradeSeverity:
+    def test_one_level(self) -> None:
+        assert _downgrade_severity(Severity.MEDIUM, 1) == Severity.LOW
+
+    def test_two_levels(self) -> None:
+        assert _downgrade_severity(Severity.MEDIUM, 2) == Severity.INFO
+
+    def test_clamps_at_info(self) -> None:
+        assert _downgrade_severity(Severity.LOW, 5) == Severity.INFO
+
+    def test_zero_levels_unchanged(self) -> None:
+        assert _downgrade_severity(Severity.HIGH, 0) == Severity.HIGH
+
+
+class TestAdjustSeverityForDepContext:
+    def test_direct_prod_unchanged(self) -> None:
+        assert (
+            _adjust_severity_for_dep_context(
+                Severity.MEDIUM, is_dev=False, is_direct=True
+            )
+            == Severity.MEDIUM
+        )
+
+    def test_transitive_prod_unchanged(self) -> None:
+        assert (
+            _adjust_severity_for_dep_context(
+                Severity.MEDIUM, is_dev=False, is_direct=False
+            )
+            == Severity.MEDIUM
+        )
+
+    def test_direct_dev_downgrade_one(self) -> None:
+        assert (
+            _adjust_severity_for_dep_context(
+                Severity.MEDIUM, is_dev=True, is_direct=True
+            )
+            == Severity.LOW
+        )
+
+    def test_transitive_dev_downgrade_two(self) -> None:
+        assert (
+            _adjust_severity_for_dep_context(
+                Severity.MEDIUM, is_dev=True, is_direct=False
+            )
+            == Severity.INFO
+        )
+
+    def test_critical_direct_dev_becomes_high(self) -> None:
+        assert (
+            _adjust_severity_for_dep_context(
+                Severity.CRITICAL, is_dev=True, is_direct=True
+            )
+            == Severity.HIGH
+        )
+
+    def test_critical_transitive_dev_becomes_medium(self) -> None:
+        assert (
+            _adjust_severity_for_dep_context(
+                Severity.CRITICAL, is_dev=True, is_direct=False
+            )
+            == Severity.MEDIUM
+        )
+
+
+class TestDepContextLabel:
+    def test_direct_prod_empty(self) -> None:
+        assert _dep_context_label(is_dev=False, is_direct=True) == ""
+
+    def test_transitive_dev(self) -> None:
+        assert (
+            _dep_context_label(is_dev=True, is_direct=False)
+            == "transitive dev dependency"
+        )
+
+    def test_direct_dev(self) -> None:
+        assert _dep_context_label(is_dev=True, is_direct=True) == "dev dependency"
+
+    def test_transitive_prod(self) -> None:
+        assert (
+            _dep_context_label(is_dev=False, is_direct=False) == "transitive dependency"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Rich ecosystem detection tests
+# ---------------------------------------------------------------------------
+
+
+class TestDetectEcosystemsRich:
+    def test_python_project_all_direct_prod(self, tmp_path: Path) -> None:
+        (tmp_path / "requirements.txt").write_text("requests==2.31.0\n")
+        result = detect_ecosystems_rich(str(tmp_path))
+        assert "PyPI" in result
+        dep = result["PyPI"][0]
+        assert dep.name == "requests"
+        assert dep.version == "2.31.0"
+        assert dep.is_direct is True
+        assert dep.is_dev is False
+
+    def test_package_json_only_classifies_dev(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text(
+            json.dumps(
+                {
+                    "dependencies": {"express": "^4.18.2"},
+                    "devDependencies": {"jest": "~29.7.0"},
+                }
+            )
+        )
+        result = detect_ecosystems_rich(str(tmp_path))
+        deps = {d.name: d for d in result["npm"]}
+        assert deps["express"].is_dev is False
+        assert deps["express"].is_direct is True
+        assert deps["jest"].is_dev is True
+        assert deps["jest"].is_direct is True
+
+    def test_lockfile_preferred_over_package_json(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text(
+            json.dumps({"dependencies": {"express": "^4.18.2"}})
+        )
+        (tmp_path / "package-lock.json").write_text(
+            json.dumps(
+                {
+                    "lockfileVersion": 3,
+                    "packages": {
+                        "": {"name": "myapp"},
+                        "node_modules/express": {"version": "4.18.2"},
+                        "node_modules/body-parser": {"version": "1.20.1"},
+                    },
+                }
+            )
+        )
+        result = detect_ecosystems_rich(str(tmp_path))
+        deps = {d.name: d for d in result["npm"]}
+        assert "express" in deps
+        assert "body-parser" in deps
+        assert deps["express"].is_direct is True
+        assert deps["body-parser"].is_direct is False
+
+    def test_lockfile_dev_flag(self, tmp_path: Path) -> None:
+        (tmp_path / "package.json").write_text(
+            json.dumps(
+                {
+                    "dependencies": {"express": "^4.18.2"},
+                    "devDependencies": {"eslint": "^8.0.0"},
+                }
+            )
+        )
+        (tmp_path / "package-lock.json").write_text(
+            json.dumps(
+                {
+                    "lockfileVersion": 3,
+                    "packages": {
+                        "": {"name": "myapp"},
+                        "node_modules/express": {"version": "4.18.2"},
+                        "node_modules/eslint": {"version": "8.50.0", "dev": True},
+                        "node_modules/brace-expansion": {
+                            "version": "1.1.12",
+                            "dev": True,
+                        },
+                    },
+                }
+            )
+        )
+        result = detect_ecosystems_rich(str(tmp_path))
+        deps = {d.name: d for d in result["npm"]}
+        assert deps["express"].is_dev is False
+        assert deps["express"].is_direct is True
+        assert deps["eslint"].is_dev is True
+        assert deps["eslint"].is_direct is True
+        assert deps["brace-expansion"].is_dev is True
+        assert deps["brace-expansion"].is_direct is False
+
+    def test_no_manifests(self, tmp_path: Path) -> None:
+        result = detect_ecosystems_rich(str(tmp_path))
+        assert result == {}
+
+    def test_lockfile_without_package_json(self, tmp_path: Path) -> None:
+        (tmp_path / "package-lock.json").write_text(
+            json.dumps(
+                {
+                    "lockfileVersion": 3,
+                    "packages": {
+                        "": {"name": "myapp"},
+                        "node_modules/lodash": {"version": "4.17.21"},
+                    },
+                }
+            )
+        )
+        result = detect_ecosystems_rich(str(tmp_path))
+        deps = {d.name: d for d in result["npm"]}
+        assert deps["lodash"].is_direct is False
+        assert deps["lodash"].is_dev is False
+
+
+# ---------------------------------------------------------------------------
+# Finding conversion with dep context
+# ---------------------------------------------------------------------------
+
+
+class TestOsvToFindingsDepContext:
+    def _make_vuln(
+        self, vuln_id: str, pkg: str, version: str, is_dev: bool, is_direct: bool
+    ) -> dict:
+        return {
+            "id": vuln_id,
+            "summary": f"Bug in {pkg}",
+            "severity": [{"type": "CVSS_V3", "score": "5.0"}],
+            "references": [],
+            "database_specific": {},
+            "_queried_package": {
+                "package": {"name": pkg, "ecosystem": "npm"},
+                "version": version,
+            },
+            "_dep_info": {"is_dev": is_dev, "is_direct": is_direct},
+        }
+
+    def test_transitive_dev_downgraded_to_info(self) -> None:
+        vulns = [
+            self._make_vuln(
+                "GHSA-1", "brace-expansion", "1.1.12", is_dev=True, is_direct=False
+            )
+        ]
+        findings = _osv_to_findings(vulns)
+        assert len(findings) == 1
+        assert findings[0].severity == Severity.INFO
+        assert "transitive dev dependency" in findings[0].title
+
+    def test_direct_dev_downgraded_to_low(self) -> None:
+        vulns = [
+            self._make_vuln("GHSA-2", "eslint", "8.50.0", is_dev=True, is_direct=True)
+        ]
+        findings = _osv_to_findings(vulns)
+        assert findings[0].severity == Severity.LOW
+        assert "dev dependency" in findings[0].title
+        assert "transitive" not in findings[0].title
+
+    def test_direct_prod_unchanged(self) -> None:
+        vulns = [
+            self._make_vuln("GHSA-3", "express", "4.18.2", is_dev=False, is_direct=True)
+        ]
+        findings = _osv_to_findings(vulns)
+        assert findings[0].severity == Severity.MEDIUM
+        assert "[" not in findings[0].title
+
+    def test_transitive_prod_unchanged_but_labeled(self) -> None:
+        vulns = [
+            self._make_vuln("GHSA-4", "qs", "6.14.0", is_dev=False, is_direct=False)
+        ]
+        findings = _osv_to_findings(vulns)
+        assert findings[0].severity == Severity.MEDIUM
+        assert "transitive dependency" in findings[0].title

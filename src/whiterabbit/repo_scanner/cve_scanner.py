@@ -11,7 +11,7 @@ import httpx
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
-from whiterabbit.repo_scanner.manifest import detect_ecosystems
+from whiterabbit.repo_scanner.manifest import DepInfo, detect_ecosystems_rich
 from whiterabbit.report.models import Finding, ScanResult, Severity
 
 log = logging.getLogger("whiterabbit")
@@ -67,15 +67,17 @@ def _extract_cvss_score(vuln: dict[str, object]) -> float | None:
 async def _query_osv(
     client: httpx.AsyncClient,
     ecosystem: str,
-    packages: list[tuple[str, str]],
+    deps: list[DepInfo],
 ) -> list[dict[str, object]]:
     """Query OSV.dev for vulnerabilities in the given packages."""
     all_results: list[dict[str, object]] = []
     queries = [
-        {"package": {"name": name, "ecosystem": ecosystem}, "version": version}
-        for name, version in packages
+        {"package": {"name": dep.name, "ecosystem": ecosystem}, "version": dep.version}
+        for dep in deps
     ]
-    for chunk in _chunks(queries, OSV_BATCH_SIZE):
+    for chunk_idx in range(0, len(queries), OSV_BATCH_SIZE):
+        chunk = queries[chunk_idx : chunk_idx + OSV_BATCH_SIZE]
+        dep_chunk = deps[chunk_idx : chunk_idx + OSV_BATCH_SIZE]
         response = await client.post(
             OSV_BATCH_URL,
             json={"queries": chunk},
@@ -87,10 +89,57 @@ async def _query_osv(
             vulns = result.get("vulns", [])
             if vulns and i < len(chunk):
                 pkg_info = chunk[i]
+                dep_info = dep_chunk[i]
                 for vuln in vulns:
                     vuln["_queried_package"] = pkg_info
+                    vuln["_dep_info"] = {
+                        "is_dev": dep_info.is_dev,
+                        "is_direct": dep_info.is_direct,
+                    }
                     all_results.append(vuln)
     return all_results
+
+
+# ---------------------------------------------------------------------------
+# Severity adjustment for dependency context
+# ---------------------------------------------------------------------------
+
+_SEVERITY_LEVELS = [
+    Severity.CRITICAL,
+    Severity.HIGH,
+    Severity.MEDIUM,
+    Severity.LOW,
+    Severity.INFO,
+]
+
+
+def _downgrade_severity(severity: Severity, levels: int) -> Severity:
+    """Shift a severity toward INFO by *levels* steps."""
+    idx = _SEVERITY_LEVELS.index(severity)
+    return _SEVERITY_LEVELS[min(idx + levels, len(_SEVERITY_LEVELS) - 1)]
+
+
+def _adjust_severity_for_dep_context(
+    severity: Severity,
+    is_dev: bool,
+    is_direct: bool,
+) -> Severity:
+    if is_dev and not is_direct:
+        return _downgrade_severity(severity, 2)
+    if is_dev:
+        return _downgrade_severity(severity, 1)
+    return severity
+
+
+def _dep_context_label(is_dev: bool, is_direct: bool) -> str:
+    parts: list[str] = []
+    if not is_direct:
+        parts.append("transitive")
+    if is_dev:
+        parts.append("dev")
+    if parts:
+        return " ".join(parts) + " dependency"
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -120,6 +169,17 @@ def _osv_to_findings(vulns: list[dict[str, object]]) -> list[Finding]:
         cvss = _extract_cvss_score(vuln)
         severity = _cvss_to_severity(cvss)
 
+        dep_meta = vuln.get("_dep_info", {})
+        is_dev = (
+            bool(dep_meta.get("is_dev", False)) if isinstance(dep_meta, dict) else False
+        )
+        is_direct = (
+            bool(dep_meta.get("is_direct", True))
+            if isinstance(dep_meta, dict)
+            else True
+        )
+        severity = _adjust_severity_for_dep_context(severity, is_dev, is_direct)
+
         summary = str(vuln.get("summary", "")) or str(vuln.get("details", ""))
         if not summary:
             summary = f"Known vulnerability {vuln_id}"
@@ -136,6 +196,9 @@ def _osv_to_findings(vulns: list[dict[str, object]]) -> list[Finding]:
         title = f"{vuln_id}: {pkg_name}" if pkg_name else vuln_id
         if pkg_version:
             title += f" ({pkg_version})"
+        ctx_label = _dep_context_label(is_dev, is_direct)
+        if ctx_label:
+            title += f" [{ctx_label}]"
 
         references: list[str] = []
         refs = vuln.get("references", [])
@@ -184,7 +247,7 @@ class CVEScanner(BaseRepoScanner):
     async def scan(self, repo_path: str, config: RepoScanConfig) -> ScanResult:
         started = datetime.now(UTC)
         try:
-            ecosystems = detect_ecosystems(repo_path)
+            ecosystems = detect_ecosystems_rich(repo_path)
             if not ecosystems:
                 log.info("[cve] no supported manifest files found")
                 return ScanResult(
@@ -196,13 +259,13 @@ class CVEScanner(BaseRepoScanner):
 
             all_findings: list[Finding] = []
             async with httpx.AsyncClient() as client:
-                for ecosystem, packages in ecosystems.items():
+                for ecosystem, deps in ecosystems.items():
                     log.info(
                         "[cve] querying OSV for %d %s packages",
-                        len(packages),
+                        len(deps),
                         ecosystem,
                     )
-                    vulns = await _query_osv(client, ecosystem, packages)
+                    vulns = await _query_osv(client, ecosystem, deps)
                     all_findings.extend(_osv_to_findings(vulns))
 
             return ScanResult(

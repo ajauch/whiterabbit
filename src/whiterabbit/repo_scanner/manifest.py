@@ -5,8 +5,19 @@ from __future__ import annotations
 import json
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+
+@dataclass
+class DepInfo:
+    """A dependency with classification metadata."""
+
+    name: str
+    version: str
+    is_dev: bool = False
+    is_direct: bool = True
 
 
 def parse_requirements_txt(path: Path) -> list[tuple[str, str]]:
@@ -113,6 +124,139 @@ def detect_ecosystems(repo_path: str) -> dict[str, list[tuple[str, str]]]:
             parsed = parser(manifest)
             if parsed:
                 results.setdefault(ecosystem, []).extend(parsed)
+    return results
+
+
+# ---------------------------------------------------------------------------
+# Rich dependency detection — adds dev/direct classification
+# ---------------------------------------------------------------------------
+
+
+def _classify_package_json(path: Path) -> tuple[set[str], set[str]]:
+    """Return (prod_names, dev_names) from a package.json."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except (json.JSONDecodeError, OSError):
+        return set(), set()
+    prod = set(data.get("dependencies", {}).keys())
+    dev = set(data.get("devDependencies", {}).keys())
+    return prod, dev
+
+
+def _parse_package_lock_rich(
+    lock_path: Path,
+    prod_names: set[str],
+    dev_names: set[str],
+) -> list[DepInfo]:
+    """Parse a lockfile and classify each entry as dev/direct using package.json context."""
+    try:
+        data = json.loads(lock_path.read_text(encoding="utf-8", errors="replace"))
+    except (json.JSONDecodeError, OSError):
+        return []
+
+    direct_names = prod_names | dev_names
+    deps: list[DepInfo] = []
+
+    packages = data.get("packages", {})
+    if packages:
+        for key, info in packages.items():
+            if not key:
+                continue
+            name = key.split("node_modules/")[-1]
+            version = info.get("version", "")
+            if not name or not version:
+                continue
+            is_dev = bool(info.get("dev", False))
+            is_direct = name in direct_names
+            deps.append(DepInfo(name, version, is_dev=is_dev, is_direct=is_direct))
+    else:
+        for name, info in data.get("dependencies", {}).items():
+            version = info.get("version", "")
+            if not version:
+                continue
+            is_dev = bool(info.get("dev", False))
+            is_direct = name in direct_names
+            deps.append(DepInfo(name, version, is_dev=is_dev, is_direct=is_direct))
+
+    return deps
+
+
+def _parse_package_json_rich(path: Path) -> list[DepInfo]:
+    """Parse package.json into DepInfo when no lockfile is available."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+    except (json.JSONDecodeError, OSError):
+        return []
+    deps: list[DepInfo] = []
+    for section, is_dev in (("dependencies", False), ("devDependencies", True)):
+        for name, version in data.get(section, {}).items():
+            clean = re.sub(r"^[~^>=<]*", "", version).strip()
+            if clean:
+                deps.append(DepInfo(name, clean, is_dev=is_dev, is_direct=True))
+    return deps
+
+
+def detect_ecosystems_rich(repo_path: str) -> dict[str, list[DepInfo]]:
+    """Like detect_ecosystems but returns DepInfo with dev/direct classification.
+
+    For npm: when both package.json and package-lock.json exist in the same
+    directory, only the lockfile is scanned (it has exact versions for every
+    transitive dep).  package.json is used solely to classify direct vs.
+    transitive and prod vs. dev.  When only package.json exists, its entries
+    are returned as direct deps.
+
+    For PyPI: all dependencies from requirements.txt / pyproject.toml are
+    treated as direct prod deps (Python tooling lacks a standard dev marker
+    in these files).
+    """
+    results: dict[str, list[DepInfo]] = {}
+
+    for dirpath, dirnames, filenames in os.walk(repo_path):
+        dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
+
+        has_package_json = "package.json" in filenames
+        has_lock = "package-lock.json" in filenames
+
+        for filename in filenames:
+            fpath = Path(dirpath) / filename
+
+            if filename == "package-lock.json" and has_package_json:
+                pj_path = Path(dirpath) / "package.json"
+                prod_names, dev_names = _classify_package_json(pj_path)
+                deps = _parse_package_lock_rich(fpath, prod_names, dev_names)
+                if deps:
+                    results.setdefault("npm", []).extend(deps)
+                continue
+
+            if filename == "package-lock.json":
+                deps = _parse_package_lock_rich(fpath, set(), set())
+                if deps:
+                    results.setdefault("npm", []).extend(deps)
+                continue
+
+            if filename == "package.json" and has_lock:
+                continue
+
+            if filename == "package.json":
+                deps = _parse_package_json_rich(fpath)
+                if deps:
+                    results.setdefault("npm", []).extend(deps)
+                continue
+
+            if filename == "requirements.txt":
+                for name, version in parse_requirements_txt(fpath):
+                    results.setdefault("PyPI", []).append(
+                        DepInfo(name, version, is_dev=False, is_direct=True)
+                    )
+                continue
+
+            if filename == "pyproject.toml":
+                for name, version in parse_pyproject_toml(fpath):
+                    results.setdefault("PyPI", []).append(
+                        DepInfo(name, version, is_dev=False, is_direct=True)
+                    )
+                continue
+
     return results
 
 
