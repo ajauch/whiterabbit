@@ -5,8 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import tempfile
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import ClassVar
+from urllib.parse import urlparse
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
@@ -15,15 +18,150 @@ from whiterabbit.resolve import resolve_binary, subprocess_env
 
 log = logging.getLogger("whiterabbit")
 
+# ---------------------------------------------------------------------------
+# Layer 1: binary / non-source extensions excluded before TruffleHog runs
+# ---------------------------------------------------------------------------
 
-def _build_command(repo_path: str) -> list[str]:
-    return [
+_BINARY_EXTENSIONS = {
+    ".wasm",
+    ".zip",
+    ".tar",
+    ".gz",
+    ".tgz",
+    ".bz2",
+    ".xz",
+    ".7z",
+    ".jar",
+    ".war",
+    ".ear",
+    ".so",
+    ".dll",
+    ".dylib",
+    ".pyc",
+    ".pyo",
+    ".exe",
+    ".bin",
+    ".o",
+    ".a",
+    ".lib",
+    ".class",
+    ".obj",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".bmp",
+    ".ico",
+    ".svg",
+    ".woff",
+    ".woff2",
+    ".ttf",
+    ".eot",
+    ".otf",
+    ".mp3",
+    ".mp4",
+    ".wav",
+    ".ogg",
+    ".webm",
+    ".avi",
+    ".mov",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".xls",
+    ".xlsx",
+}
+
+# ---------------------------------------------------------------------------
+# Layer 2: post-parse context filters
+# ---------------------------------------------------------------------------
+
+_TEST_DIR_SEGMENTS = {
+    "test",
+    "tests",
+    "__tests__",
+    "__test__",
+    "spec",
+    "specs",
+    "fixtures",
+    "fixture",
+    "mocks",
+    "mock",
+    "__mocks__",
+    "testdata",
+    "test_data",
+    "testutils",
+    "testing",
+}
+
+_KNOWN_PUBLIC_KEYS = {
+    # YouTube innertube API keys — embedded in every YT/YTM client, not secret
+    "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30",
+    "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8",
+    "AIzaSyB-63vPrdThhKuerbB2N_l7Kwwcxj6yUAc",
+}
+
+_TEST_CREDENTIAL_VALUES = {
+    "password",
+    "pass",
+    "secret",
+    "changeme",
+    "test",
+    "example",
+    "dummy",
+    "placeholder",
+    "admin",
+    "root",
+    "default",
+}
+
+
+def _is_test_path(filepath: str) -> bool:
+    parts = Path(filepath).parts
+    return bool(set(parts) & _TEST_DIR_SEGMENTS)
+
+
+def _is_known_public_key(raw_secret: str) -> bool:
+    return raw_secret.strip() in _KNOWN_PUBLIC_KEYS
+
+
+def _looks_like_test_credential(raw_secret: str) -> bool:
+    if "://" in raw_secret and "@" in raw_secret:
+        try:
+            parsed = urlparse(raw_secret)
+            if parsed.password and parsed.password.lower() in _TEST_CREDENTIAL_VALUES:
+                return True
+            if parsed.hostname in ("localhost", "127.0.0.1", "0.0.0.0", "host.test"):
+                return True
+        except Exception:
+            pass
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Command building
+# ---------------------------------------------------------------------------
+
+
+def _write_exclude_file(path: str) -> None:
+    """Write TruffleHog --exclude-paths regex file."""
+    with open(path, "w") as f:
+        for ext in sorted(_BINARY_EXTENSIONS):
+            escaped = ext.replace(".", r"\.")
+            f.write(f"{escaped}$\n")
+
+
+def _build_command(repo_path: str, exclude_file: str | None = None) -> list[str]:
+    cmd = [
         resolve_binary("trufflehog") or "trufflehog",
         "filesystem",
         "--json",
         "--no-update",
-        repo_path,
     ]
+    if exclude_file:
+        cmd += ["--exclude-paths", exclude_file]
+    cmd.append(repo_path)
+    return cmd
 
 
 def _redact(raw: str, keep: int = 5) -> str:
@@ -60,7 +198,22 @@ def _parse_trufflehog_output(raw: str) -> list[Finding]:
             continue
         seen.add(dedup_key)
 
-        severity = Severity.CRITICAL if verified else Severity.MEDIUM
+        # Layer 2: skip known-public keys
+        if _is_known_public_key(secret_raw):
+            continue
+
+        # Layer 2 + 3: test directory handling
+        in_test_dir = _is_test_path(filepath)
+        if in_test_dir and _looks_like_test_credential(secret_raw):
+            continue
+
+        if verified:
+            severity = Severity.CRITICAL
+        elif in_test_dir:
+            severity = Severity.INFO
+        else:
+            severity = Severity.MEDIUM
+
         status = "verified active" if verified else "unverified"
 
         location = f"{filepath}:{line_num}" if filepath and line_num else filepath
@@ -103,9 +256,18 @@ class SecretScanner(BaseRepoScanner):
     async def scan(self, repo_path: str, config: RepoScanConfig) -> ScanResult:
         started = datetime.now(UTC)
         timeout = self.effective_timeout(config)
-        cmd = _build_command(repo_path)
 
         try:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                suffix=".txt",
+                delete=False,
+            ) as tmp:
+                _write_exclude_file(tmp.name)
+                exclude_path = tmp.name
+
+            cmd = _build_command(repo_path, exclude_path)
+
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
                 stdout=asyncio.subprocess.PIPE,
@@ -116,6 +278,8 @@ class SecretScanner(BaseRepoScanner):
                 proc.communicate(),
                 timeout=timeout + 30,
             )
+
+            Path(exclude_path).unlink(missing_ok=True)
 
             if proc.returncode not in (0, 1):
                 error_msg = stderr.decode(errors="replace").strip()

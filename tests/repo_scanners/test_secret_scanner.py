@@ -8,10 +8,15 @@ from unittest.mock import AsyncMock, patch
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.secret_scanner import (
+    _BINARY_EXTENSIONS,
     SecretScanner,
     _build_command,
+    _is_known_public_key,
+    _is_test_path,
+    _looks_like_test_credential,
     _parse_trufflehog_output,
     _redact,
+    _write_exclude_file,
 )
 from whiterabbit.report.models import Severity
 
@@ -55,6 +60,27 @@ class TestRedact:
         assert _redact("AKIAIOSFODNN7EXAMPLE", keep=3) == "AKI***"
 
 
+# ---------------------------------------------------------------------------
+# Layer 1: exclude file
+# ---------------------------------------------------------------------------
+
+
+class TestWriteExcludeFile:
+    def test_generates_regex_patterns(self, tmp_path) -> None:
+        path = tmp_path / "exclude.txt"
+        _write_exclude_file(str(path))
+        content = path.read_text()
+        assert r"\.wasm$" in content
+        assert r"\.zip$" in content
+        assert r"\.png$" in content
+
+    def test_one_pattern_per_line(self, tmp_path) -> None:
+        path = tmp_path / "exclude.txt"
+        _write_exclude_file(str(path))
+        lines = [ln for ln in path.read_text().splitlines() if ln.strip()]
+        assert len(lines) == len(_BINARY_EXTENSIONS)
+
+
 class TestBuildCommand:
     def test_default_command(self) -> None:
         with patch(
@@ -67,6 +93,85 @@ class TestBuildCommand:
         assert "--json" in cmd
         assert "--no-update" in cmd
         assert "/tmp/repo" in cmd
+
+    def test_exclude_file_passed(self) -> None:
+        with patch(
+            "whiterabbit.repo_scanner.secret_scanner.resolve_binary",
+            return_value="trufflehog",
+        ):
+            cmd = _build_command("/tmp/repo", "/tmp/exclude.txt")
+        assert "--exclude-paths" in cmd
+        idx = cmd.index("--exclude-paths")
+        assert cmd[idx + 1] == "/tmp/exclude.txt"
+
+    def test_no_exclude_file(self) -> None:
+        with patch(
+            "whiterabbit.repo_scanner.secret_scanner.resolve_binary",
+            return_value="trufflehog",
+        ):
+            cmd = _build_command("/tmp/repo")
+        assert "--exclude-paths" not in cmd
+
+
+# ---------------------------------------------------------------------------
+# Layer 2: context filters
+# ---------------------------------------------------------------------------
+
+
+class TestIsTestPath:
+    def test_test_directory(self) -> None:
+        assert _is_test_path("tests/conftest.py")
+        assert _is_test_path("__tests__/envFilter.test.ts")
+        assert _is_test_path("src/__tests__/utils.test.js")
+
+    def test_fixture_directory(self) -> None:
+        assert _is_test_path("fixtures/data.json")
+        assert _is_test_path("test/fixtures/creds.yml")
+
+    def test_non_test_directory(self) -> None:
+        assert not _is_test_path("src/config.py")
+        assert not _is_test_path("lib/auth/keys.js")
+
+    def test_test_in_filename_not_dir(self) -> None:
+        assert not _is_test_path("src/test_utils.py")
+
+
+class TestIsKnownPublicKey:
+    def test_innertube_key(self) -> None:
+        assert _is_known_public_key("AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30")
+
+    def test_innertube_key_with_whitespace(self) -> None:
+        assert _is_known_public_key("  AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30  ")
+
+    def test_unknown_key(self) -> None:
+        assert not _is_known_public_key("AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+
+
+class TestLooksLikeTestCredential:
+    def test_localhost_uri(self) -> None:
+        assert _looks_like_test_credential("http://user:pass@localhost:5432/db")
+
+    def test_loopback_uri(self) -> None:
+        assert _looks_like_test_credential("postgres://u:p@127.0.0.1/testdb")
+
+    def test_password_placeholder(self) -> None:
+        assert _looks_like_test_credential("http://admin:password@example.com/api")
+
+    def test_changeme_placeholder(self) -> None:
+        assert _looks_like_test_credential("mysql://root:changeme@db.host/mydb")
+
+    def test_real_looking_uri(self) -> None:
+        assert not _looks_like_test_credential(
+            "postgres://produser:s3cReT_K3y@db.prod.example.com/app"
+        )
+
+    def test_non_uri(self) -> None:
+        assert not _looks_like_test_credential("AKIAIOSFODNN7EXAMPLE")
+
+
+# ---------------------------------------------------------------------------
+# Parsing with layers 2 + 3
+# ---------------------------------------------------------------------------
 
 
 class TestParseTrufflehogOutput:
@@ -127,6 +232,61 @@ class TestParseTrufflehogOutput:
         findings = _parse_trufflehog_output(output)
         assert findings[0].raw["redacted"] == "AKIAI***"
         assert "AKIAIOSFODNN7EXAMPLE" not in str(findings[0].raw)
+
+    # Layer 2: known public keys are dropped
+    def test_known_public_key_dropped(self) -> None:
+        output = _make_trufflehog_finding(
+            detector="GoogleGeminiAPIKey",
+            filepath="src/ytm/YtmSearch.kt",
+            raw="AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30",
+        )
+        findings = _parse_trufflehog_output(output)
+        assert len(findings) == 0
+
+    # Layer 2: test credential URIs in test dirs are dropped
+    def test_test_credential_in_test_dir_dropped(self) -> None:
+        output = _make_trufflehog_finding(
+            detector="URI",
+            filepath="__tests__/envFilter.test.ts",
+            raw="http://user:password@localhost:5432/db",
+        )
+        findings = _parse_trufflehog_output(output)
+        assert len(findings) == 0
+
+    # Layer 3: unverified secret in test dir downgraded to INFO
+    def test_unverified_in_test_dir_downgraded_to_info(self) -> None:
+        output = _make_trufflehog_finding(
+            detector="AWS",
+            filepath="tests/integration/test_auth.py",
+            raw="AKIAIOSFODNN7REAL123",
+            verified=False,
+        )
+        findings = _parse_trufflehog_output(output)
+        assert len(findings) == 1
+        assert findings[0].severity == Severity.INFO
+
+    # Layer 3: verified secret in test dir stays CRITICAL
+    def test_verified_in_test_dir_stays_critical(self) -> None:
+        output = _make_trufflehog_finding(
+            detector="AWS",
+            filepath="tests/integration/test_auth.py",
+            raw="AKIAIOSFODNN7REAL123",
+            verified=True,
+        )
+        findings = _parse_trufflehog_output(output)
+        assert len(findings) == 1
+        assert findings[0].severity == Severity.CRITICAL
+
+    # Layer 2: test credentials outside test dirs are NOT dropped
+    def test_test_credential_outside_test_dir_kept(self) -> None:
+        output = _make_trufflehog_finding(
+            detector="URI",
+            filepath="src/config.py",
+            raw="http://user:password@localhost:5432/db",
+        )
+        findings = _parse_trufflehog_output(output)
+        assert len(findings) == 1
+        assert findings[0].severity == Severity.MEDIUM
 
 
 class TestSecretScanner:
@@ -220,3 +380,18 @@ class TestSecretScanner:
             result = asyncio.run(scanner.scan("/tmp/repo", config))
             assert result.error is None
             assert len(result.findings) == 0
+
+    def test_exclude_paths_passed_to_trufflehog(self) -> None:
+        proc = AsyncMock()
+        proc.returncode = 0
+        proc.communicate = AsyncMock(return_value=(b"", b""))
+
+        with patch(
+            "whiterabbit.repo_scanner.secret_scanner.asyncio.create_subprocess_exec",
+            return_value=proc,
+        ) as mock_exec:
+            scanner = SecretScanner()
+            config = RepoScanConfig()
+            asyncio.run(scanner.scan("/tmp/repo", config))
+            call_args = mock_exec.call_args[0]
+            assert "--exclude-paths" in call_args
