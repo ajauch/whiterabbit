@@ -216,6 +216,11 @@ class TestNucleiScanner:
         assert scanner.display_name == "Nuclei Scanner"
         assert "nuclei" in scanner.required_binaries
 
+    def test_min_timeout(self, sample_config: ScanConfig) -> None:
+        scanner = NucleiScanner()
+        assert scanner.min_timeout == 900
+        assert scanner.effective_timeout(sample_config) >= 900
+
     def test_successful_scan(self) -> None:
         findings_json = [
             json.dumps(

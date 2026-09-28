@@ -132,6 +132,7 @@ class NucleiScanner(BaseScanner):
     display_name = "Nuclei Scanner"
     description = "Detects misconfigurations, exposed secrets, and exposures using Nuclei (passive templates only)"
     required_binaries: ClassVar[list[str]] = ["nuclei"]
+    min_timeout: int | None = 900
 
     async def scan(self, target: str, config: ScanConfig) -> ScanResult:
         url = _normalize_target(target)
