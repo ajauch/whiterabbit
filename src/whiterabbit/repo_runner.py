@@ -150,6 +150,12 @@ class RepoScanRunner:
 
         all_findings = _deduplicate_findings(all_findings)
 
+        deduped_by_scanner: dict[str, list[Finding]] = {}
+        for f in all_findings:
+            deduped_by_scanner.setdefault(f.scanner, []).append(f)
+        for r in results:
+            r.findings = deduped_by_scanner.get(r.scanner_name, [])
+
         grade = compute_grade(all_findings)
         summary: dict[Severity, int] = {s: 0 for s in Severity}
         for f in all_findings:
