@@ -50,6 +50,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Branch protection policy documented in README — CI, review, signing, and
   force-push rules.
 
+- OWASP ASVS v5.0.0 compliance mapping — findings now carry an `asvs` field
+  referencing the specific ASVS requirement they verify (e.g. `v5.0.0-3.4.1`
+  for HSTS). HTML reports include an ASVS compliance summary section showing
+  tested requirements and pass/fail status by chapter.
+- HTTP TRACE method detection — the headers scanner now sends a TRACE request
+  and flags servers that respond with 200 (ASVS 13.4.4, CWE-693).
+- `.git` directory exposure check — probes `/.git/HEAD` and flags publicly
+  accessible source control metadata (ASVS 13.4.1, CWE-538).
+- CSP reporting directive check — flags Content-Security-Policy headers that
+  lack `report-uri` or `report-to` directives (ASVS 3.4.7).
 - Fast scan mode (`--fast`) — skips slow scanners (testssl) for quicker results
   while still running SSL, headers, nuclei, and retire.js.
 - `scanners_unavailable` field in `ScanReport` — records which scanners were

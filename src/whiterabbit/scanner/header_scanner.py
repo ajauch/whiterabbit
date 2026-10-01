@@ -50,6 +50,8 @@ class HeaderScanner(BaseScanner):
                 findings.extend(_check_cors(headers))
                 findings.extend(_check_cookies(response))
                 findings.extend(await _check_https_redirect(target, client))
+                findings.extend(await _check_trace_method(url, client))
+                findings.extend(await _check_git_exposure(url, client))
 
         except httpx.TimeoutException:
             return ScanResult(
@@ -98,6 +100,7 @@ def _check_hsts(headers: httpx.Headers) -> list[Finding]:
                 category="headers",
                 scanner="headers",
                 cwe="CWE-523",
+                asvs="v5.0.0-3.4.1",
             )
         )
     else:
@@ -114,6 +117,7 @@ def _check_hsts(headers: httpx.Headers) -> list[Finding]:
                             category="headers",
                             scanner="headers",
                             cwe="CWE-523",
+                            asvs="v5.0.0-3.4.1",
                         )
                     )
             except (ValueError, IndexError):  # nosec B110
@@ -134,6 +138,7 @@ def _check_csp(headers: httpx.Headers) -> list[Finding]:
                 category="headers",
                 scanner="headers",
                 cwe="CWE-693",
+                asvs="v5.0.0-3.4.3",
             )
         )
     else:
@@ -149,8 +154,21 @@ def _check_csp(headers: httpx.Headers) -> list[Finding]:
                         category="headers",
                         scanner="headers",
                         cwe="CWE-693",
+                        asvs="v5.0.0-3.4.3",
                     )
                 )
+        if "report-uri" not in csp_lower and "report-to" not in csp_lower:
+            findings.append(
+                Finding(
+                    severity=Severity.LOW,
+                    title="CSP has no reporting directive",
+                    description="The Content-Security-Policy header does not include a report-uri or report-to directive. CSP violations will go undetected.",
+                    remediation="Add a reporting endpoint: `Content-Security-Policy: ...; report-uri /csp-report` or use the Reporting-Endpoints header with `report-to`.",
+                    category="headers",
+                    scanner="headers",
+                    asvs="v5.0.0-3.4.7",
+                )
+            )
     return findings
 
 
@@ -166,6 +184,7 @@ def _check_x_content_type_options(headers: httpx.Headers) -> list[Finding]:
                 category="headers",
                 scanner="headers",
                 cwe="CWE-693",
+                asvs="v5.0.0-3.4.4",
             )
         ]
     return []
@@ -184,6 +203,7 @@ def _check_x_frame_options(headers: httpx.Headers) -> list[Finding]:
                 category="headers",
                 scanner="headers",
                 cwe="CWE-1021",
+                asvs="v5.0.0-3.4.6",
             )
         ]
     return []
@@ -199,6 +219,7 @@ def _check_referrer_policy(headers: httpx.Headers) -> list[Finding]:
                 remediation="Add: `Referrer-Policy: strict-origin-when-cross-origin`",
                 category="headers",
                 scanner="headers",
+                asvs="v5.0.0-3.4.5",
             )
         ]
     return []
@@ -231,6 +252,7 @@ def _check_server_header(headers: httpx.Headers) -> list[Finding]:
                 category="headers",
                 scanner="headers",
                 cwe="CWE-200",
+                asvs="v5.0.0-13.4.6",
             )
         ]
     return []
@@ -248,6 +270,7 @@ def _check_x_powered_by(headers: httpx.Headers) -> list[Finding]:
                 category="headers",
                 scanner="headers",
                 cwe="CWE-200",
+                asvs="v5.0.0-13.4.6",
             )
         ]
     return []
@@ -263,6 +286,7 @@ def _check_coop(headers: httpx.Headers) -> list[Finding]:
                 remediation="Add: `Cross-Origin-Opener-Policy: same-origin`",
                 category="headers",
                 scanner="headers",
+                asvs="v5.0.0-3.4.8",
             )
         ]
     return []
@@ -295,6 +319,7 @@ def _check_cors(headers: httpx.Headers) -> list[Finding]:
                 category="headers",
                 scanner="headers",
                 cwe="CWE-942",
+                asvs="v5.0.0-3.4.2",
             )
         ]
     return []
@@ -317,6 +342,7 @@ def _check_cookies(response: httpx.Response) -> list[Finding]:
                     category="cookies",
                     scanner="headers",
                     cwe="CWE-614",
+                    asvs="v5.0.0-3.3.1",
                 )
             )
 
@@ -330,6 +356,7 @@ def _check_cookies(response: httpx.Response) -> list[Finding]:
                     category="cookies",
                     scanner="headers",
                     cwe="CWE-1004",
+                    asvs="v5.0.0-3.3.4",
                 )
             )
 
@@ -343,6 +370,7 @@ def _check_cookies(response: httpx.Response) -> list[Finding]:
                     category="cookies",
                     scanner="headers",
                     cwe="CWE-1275",
+                    asvs="v5.0.0-3.3.2",
                 )
             )
 
@@ -371,6 +399,7 @@ async def _check_https_redirect(
                     category="headers",
                     scanner="headers",
                     cwe="CWE-319",
+                    asvs="v5.0.0-12.2.1",
                 )
             ]
     except httpx.ConnectError:  # nosec B110
@@ -378,4 +407,49 @@ async def _check_https_redirect(
     except Exception:  # nosec B110
         pass
 
+    return []
+
+
+async def _check_trace_method(url: str, client: httpx.AsyncClient) -> list[Finding]:
+    try:
+        response = await client.request("TRACE", url)
+        if response.status_code == 200:
+            return [
+                Finding(
+                    severity=Severity.MEDIUM,
+                    title="HTTP TRACE method enabled",
+                    description="The server responds to TRACE requests, which can be exploited for Cross-Site Tracing (XST) to steal credentials.",
+                    remediation="Disable the TRACE method in your web server configuration. For Apache: `TraceEnable Off`. For Nginx, TRACE is disabled by default.",
+                    category="headers",
+                    scanner="headers",
+                    cwe="CWE-693",
+                    asvs="v5.0.0-13.4.4",
+                )
+            ]
+    except Exception:  # nosec B110
+        pass
+    return []
+
+
+async def _check_git_exposure(url: str, client: httpx.AsyncClient) -> list[Finding]:
+    parsed = urlparse(url)
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    git_url = f"{base}/.git/HEAD"
+    try:
+        response = await client.get(git_url, follow_redirects=False)
+        if response.status_code == 200 and "ref:" in response.text:
+            return [
+                Finding(
+                    severity=Severity.HIGH,
+                    title=".git directory exposed",
+                    description="The .git directory is publicly accessible, allowing attackers to download the full source code, commit history, and potentially secrets.",
+                    remediation="Block access to .git in your web server. For Nginx: `location ~ /\\.git { deny all; }`. For Apache: `RedirectMatch 404 /\\.git`.",
+                    category="config",
+                    scanner="headers",
+                    cwe="CWE-538",
+                    asvs="v5.0.0-13.4.1",
+                )
+            ]
+    except Exception:  # nosec B110
+        pass
     return []

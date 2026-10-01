@@ -41,13 +41,15 @@ WhiteRabbit is a local web security scanner. Src layout: `src/whiterabbit/`.
 
 **Scanner contract:** Scanners subclass `BaseScanner` (`scanner/base.py`). They must implement `async scan(target, config) -> ScanResult`, never raise (catch exceptions and return `ScanResult` with `error` set), and include remediation text on every `Finding`. External binary dependencies go in `required_binaries`; the base class checks PATH availability. Scanners are explicitly registered in the `SCANNER_REGISTRY` dict in `scanner/__init__.py` — no auto-discovery.
 
-**Scanners:** `ssl` (SSLyze library), `headers` (httpx), `nuclei` (subprocess, requires `nuclei` binary), `retirejs` (pure Python, downloads vuln DB), `testssl` (subprocess via Git Bash on Windows, requires `testssl.sh`). The testssl scanner overrides `is_available()`/`check_dependencies()` instead of using `required_binaries`.
+**Scanners:** `ssl` (SSLyze library), `headers` (httpx — also checks TRACE method, .git exposure, and CSP reporting), `nuclei` (subprocess, requires `nuclei` binary), `retirejs` (pure Python, downloads vuln DB), `testssl` (subprocess via Git Bash on Windows, requires `testssl.sh`). The testssl scanner overrides `is_available()`/`check_dependencies()` instead of using `required_binaries`.
 
-**Data models** (`report/models.py`): Pydantic v2. `Severity` enum (critical/high/medium/low/info), `Finding`, `ScanResult`, `UnavailableScanner`, `ScanReport`. `ScanReport.scanners_unavailable` records scanners that were requested but failed the `is_available()` check (binary not on PATH, etc.).
+**Data models** (`report/models.py`): Pydantic v2. `Severity` enum (critical/high/medium/low/info), `Finding`, `ScanResult`, `UnavailableScanner`, `ScanReport`. `Finding` has optional `cwe`, `cve`, and `asvs` fields. `ScanReport.scanners_unavailable` records scanners that were requested but failed the `is_available()` check (binary not on PATH, etc.).
 
 **Grading** (`report/grader.py`): Waterfall — any critical→F, high→D, medium→C, low→B, info-only→A, none→A+.
 
-**HTML reports** use a Jinja2 template at `templates/report.html`.
+**HTML reports** use a Jinja2 template at `templates/report.html`. Reports include an ASVS v5.0.0 compliance summary section showing which requirements were tested and their pass/fail status.
+
+**ASVS mapping:** Findings reference OWASP ASVS v5.0.0 requirements via the `asvs` field (format: `v5.0.0-<chapter>.<section>.<req>`). Headers scanner maps to V3 (Web Frontend Security) and V13 (Configuration); SSL scanner maps to V12 (Secure Communication); logleak maps to V16 (Security Logging); secret scanner maps to V13 (Secret Management).
 
 **Repo scan pipeline:** CLI `scanrepo` command auto-detects local directories vs git URLs. For URLs, it clones via `clone_repo()` (async context manager with temp dir cleanup). `RepoScanRunner` (`repo_runner.py`) orchestrates repo scanners concurrently — same TaskGroup/timeout/progress pattern as `ScanRunner`. Reuses all existing data models and formatters.
 

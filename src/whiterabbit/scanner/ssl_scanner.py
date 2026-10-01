@@ -134,6 +134,7 @@ class SSLScanner(BaseScanner):
                         category="ssl",
                         scanner=self.name,
                         cwe="CWE-298",
+                        asvs="v5.0.0-12.2.2",
                     )
                 )
 
@@ -147,6 +148,7 @@ class SSLScanner(BaseScanner):
                         remediation="Renew the certificate before it expires. Consider setting up auto-renewal with Let's Encrypt.",
                         category="ssl",
                         scanner=self.name,
+                        asvs="v5.0.0-12.2.2",
                     )
                 )
 
@@ -160,6 +162,7 @@ class SSLScanner(BaseScanner):
                         category="ssl",
                         scanner=self.name,
                         cwe="CWE-295",
+                        asvs="v5.0.0-12.2.2",
                     )
                 )
 
@@ -192,6 +195,7 @@ class SSLScanner(BaseScanner):
                         category="ssl",
                         scanner=self.name,
                         cwe="CWE-295",
+                        asvs="v5.0.0-12.3.2",
                     )
                 )
 
@@ -229,6 +233,7 @@ class SSLScanner(BaseScanner):
                         category="ssl",
                         scanner=self.name,
                         cwe="CWE-295",
+                        asvs="v5.0.0-12.3.2",
                     )
                 )
 
@@ -247,6 +252,7 @@ class SSLScanner(BaseScanner):
                         remediation="Enable OCSP stapling in your server configuration. For Nginx: `ssl_stapling on; ssl_stapling_verify on;`",
                         category="ssl",
                         scanner=self.name,
+                        asvs="v5.0.0-12.1.4",
                     )
                 )
 
@@ -312,6 +318,7 @@ class SSLScanner(BaseScanner):
                         scanner=self.name,
                         cwe=cwe,
                         cve=cve,
+                        asvs="v5.0.0-12.1.1",
                     )
                 )
 
@@ -330,6 +337,7 @@ class SSLScanner(BaseScanner):
                         remediation="Enable TLS 1.3 in your server configuration. For Nginx: `ssl_protocols TLSv1.2 TLSv1.3;`",
                         category="ssl",
                         scanner=self.name,
+                        asvs="v5.0.0-12.1.1",
                     )
                 )
 
@@ -363,6 +371,7 @@ class SSLScanner(BaseScanner):
                             category="ssl",
                             scanner=self.name,
                             cwe="CWE-326",
+                            asvs="v5.0.0-12.1.2",
                         )
                     )
 

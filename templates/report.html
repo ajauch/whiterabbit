@@ -16,6 +16,8 @@
   --sev-low: #1e90cc; --sev-info: #8c8fa1;
   --remedy-bg: rgba(64, 160, 43, 0.08); --remedy-border: rgba(64, 160, 43, 0.25);
   --link: #1e66f5; --code-bg: #e6e9ef;
+  --asvs-bg: rgba(30, 102, 245, 0.06); --asvs-border: rgba(30, 102, 245, 0.2);
+  --pass: #40a02b; --fail: #d20f39;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -28,6 +30,8 @@
     --sev-low: #89dceb; --sev-info: #7f849c;
     --remedy-bg: rgba(166, 227, 161, 0.08); --remedy-border: rgba(166, 227, 161, 0.2);
     --link: #89b4fa; --code-bg: #313244;
+    --asvs-bg: rgba(137, 180, 250, 0.06); --asvs-border: rgba(137, 180, 250, 0.2);
+    --pass: #a6e3a1; --fail: #f38ba8;
   }
 }
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -109,6 +113,7 @@ tr.hidden { display: none; }
 .badge-medium { background: var(--sev-medium); color: #1e1e2e; }
 .badge-low { background: var(--sev-low); }
 .badge-info { background: var(--sev-info); }
+.badge-asvs { background: var(--asvs-bg); border: 1px solid var(--asvs-border); color: var(--link); font-weight: 600; font-size: 0.72rem; }
 
 /* Finding cards */
 .finding-card {
@@ -116,7 +121,7 @@ tr.hidden { display: none; }
   padding: 1.2rem 1.4rem; margin: 0.8rem 0; transition: box-shadow 0.15s;
 }
 .finding-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
-.finding-card h3 { margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+.finding-card h3 { margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
 .finding-card p { margin: 0.3rem 0; font-size: 0.93rem; }
 .remediation {
   background: var(--remedy-bg); border-left: 3px solid var(--remedy-border);
@@ -125,6 +130,19 @@ tr.hidden { display: none; }
 .remediation strong { display: block; margin-bottom: 0.2rem; }
 .refs { font-size: 0.85rem; color: var(--fg-muted); margin-top: 0.5rem; }
 .meta-line { font-size: 0.82rem; color: var(--fg-muted); margin-top: 0.3rem; }
+
+/* ASVS compliance */
+.asvs-section { margin: 1.5rem 0; }
+.asvs-chapter { margin: 0.8rem 0; }
+.asvs-chapter-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 0.3rem; }
+.asvs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0.4rem; }
+.asvs-item {
+  background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 6px;
+  padding: 0.35rem 0.6rem; font-size: 0.82rem; display: flex; justify-content: space-between; align-items: center;
+}
+.asvs-item .id { font-weight: 600; font-family: monospace; }
+.asvs-pass { color: var(--pass); font-weight: 700; }
+.asvs-fail { color: var(--fail); font-weight: 700; }
 
 /* Scanner details */
 .scanner-details {
@@ -214,6 +232,47 @@ footer { text-align: center; margin-top: 3rem; padding-top: 1.5rem;
   {% endfor %}
 {% endfor %}
 
+{# ── ASVS Compliance Summary ── #}
+{% set asvs_findings = all_findings | selectattr('asvs') | list %}
+{% if asvs_findings %}
+{% set asvs_chapter_names = {
+  "3": "V3 Web Frontend Security",
+  "12": "V12 Secure Communication",
+  "13": "V13 Configuration",
+  "16": "V16 Security Logging"
+} %}
+{% set ns = namespace(asvs_map={}) %}
+{% for f in asvs_findings %}
+  {% set req_id = f.asvs.split('-', 1)[1] if '-' in f.asvs else f.asvs %}
+  {% set chapter = req_id.split('.')[0] %}
+  {% if chapter not in ns.asvs_map %}
+    {% set _ = ns.asvs_map.update({chapter: {}}) %}
+  {% endif %}
+  {% set _ = ns.asvs_map[chapter].update({req_id: 'fail'}) %}
+{% endfor %}
+
+<h2>ASVS v5.0.0 Compliance</h2>
+<p style="font-size:0.88rem; color:var(--fg-muted); margin-bottom:0.8rem;">
+  Requirements tested against <a href="https://github.com/OWASP/ASVS" rel="noopener">OWASP Application Security Verification Standard v5.0.0</a>.
+  Only requirements covered by this scan are shown.
+</p>
+<div class="asvs-section">
+  {% for chapter in ns.asvs_map | sort %}
+  <div class="asvs-chapter">
+    <div class="asvs-chapter-title">{{ asvs_chapter_names.get(chapter, "V" + chapter) }}</div>
+    <div class="asvs-grid">
+      {% for req_id in ns.asvs_map[chapter] | sort %}
+      <div class="asvs-item">
+        <span class="id">{{ req_id }}</span>
+        <span class="asvs-fail">&#10007;</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% if all_findings %}
 <h2>Findings</h2>
 
@@ -253,7 +312,7 @@ footer { text-align: center; margin-top: 3rem; padding-top: 1.5rem;
 
 {% for f in all_findings | sort(attribute='severity.value') %}
 <div class="finding-card" id="finding-{{ loop.index }}" data-category="{{ f.category }}">
-  <h3><span class="badge badge-{{ f.severity.value }}">{{ f.severity.value }}</span> {{ f.title }}</h3>
+  <h3><span class="badge badge-{{ f.severity.value }}">{{ f.severity.value }}</span> {{ f.title }}{% if f.asvs %} <span class="badge badge-asvs">ASVS {{ f.asvs.split('-', 1)[1] if '-' in f.asvs else f.asvs }}</span>{% endif %}</h3>
   <p>{{ f.description }}</p>
   {% if f.remediation %}
   <div class="remediation">
@@ -261,11 +320,13 @@ footer { text-align: center; margin-top: 3rem; padding-top: 1.5rem;
     {{ f.remediation }}
   </div>
   {% endif %}
-  {% if f.cwe or f.cve %}
+  {% if f.cwe or f.cve or f.asvs %}
   <p class="meta-line">
     {% if f.cwe %}{{ f.cwe }}{% endif %}
     {% if f.cwe and f.cve %} &middot; {% endif %}
     {% if f.cve %}{{ f.cve }}{% endif %}
+    {% if (f.cwe or f.cve) and f.asvs %} &middot; {% endif %}
+    {% if f.asvs %}ASVS {{ f.asvs }}{% endif %}
   </p>
   {% endif %}
   {% if f.references %}

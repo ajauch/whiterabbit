@@ -244,6 +244,7 @@ def _scan_file(path: Path, repo_root: str) -> list[Finding]:
                     category="log-leak",
                     scanner="logleak",
                     cwe="CWE-532",
+                    asvs="v5.0.0-16.2.5",
                     references=["https://cwe.mitre.org/data/definitions/532.html"],
                     raw={
                         "file": rel,
@@ -282,6 +283,7 @@ def _scan_file(path: Path, repo_root: str) -> list[Finding]:
                     category="log-leak",
                     scanner="logleak",
                     cwe="CWE-532",
+                    asvs="v5.0.0-16.2.5",
                     references=["https://cwe.mitre.org/data/definitions/532.html"],
                     raw={
                         "file": rel,

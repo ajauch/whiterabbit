@@ -234,6 +234,7 @@ def _parse_trufflehog_output(raw: str) -> list[Finding]:
                 remediation=f"Revoke the {detector} credential immediately and rotate it. Remove the secret from source code and use environment variables or a secrets manager instead.",
                 category="secret",
                 scanner="secret",
+                asvs="v5.0.0-13.3.1",
                 raw={
                     "detector": detector,
                     "verified": verified,

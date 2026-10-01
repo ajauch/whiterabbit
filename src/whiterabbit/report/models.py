@@ -34,6 +34,7 @@ class Finding(BaseModel):
     scanner: str
     cwe: str | None = None
     cve: str | None = None
+    asvs: str | None = None
     references: list[str] = Field(default_factory=list)
     raw: dict[str, object] | None = None
 

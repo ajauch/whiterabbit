@@ -153,7 +153,7 @@ whiterabbit check-repo-deps
 | Scanner | What it checks | Dependencies |
 |---------|---------------|--------------|
 | `ssl` | Certificate validation, protocol support, cipher suites, Heartbleed, ROBOT | None (SSLyze, pure Python) |
-| `headers` | HSTS, CSP, cookie flags, CORS, HTTPS redirect, and 15+ other HTTP headers | None (httpx, pure Python) |
+| `headers` | HSTS, CSP, cookie flags, CORS, HTTPS redirect, TRACE method, .git exposure, and 15+ other checks | None (httpx, pure Python) |
 | `nuclei` | Misconfiguration, exposure, and technology detection via community templates | [Nuclei](https://github.com/projectdiscovery/nuclei#install-nuclei) |
 | `retirejs` | Known-vulnerable JavaScript libraries against the retire.js database | None (pure Python) |
 | `testssl` | Deep TLS/SSL analysis: BEAST, POODLE, DROWN, FREAK, Logjam, SWEET32, Ticketbleed | [testssl.sh](https://github.com/drwetter/testssl.sh#install) |
@@ -220,6 +220,21 @@ distinguish "scanner found nothing" from "scanner was never attempted."
 
 For remote repos, `scanrepo` clones into a temporary directory (shallow by
 default) and cleans up automatically after the scan completes.
+
+### ASVS compliance mapping
+
+Findings reference specific requirements from the [OWASP Application Security
+Verification Standard (ASVS) v5.0.0](https://github.com/OWASP/ASVS). Each
+finding's `asvs` field carries the requirement ID (e.g. `v5.0.0-3.4.1` for
+HSTS). HTML reports include a per-chapter compliance summary showing which
+requirements were tested and their pass/fail status.
+
+| Scanner | ASVS chapters covered |
+|---------|----------------------|
+| `headers` | V3 Web Frontend Security, V13 Configuration |
+| `ssl` | V12 Secure Communication |
+| `logleak` | V16 Security Logging |
+| `secret` | V13 Configuration (Secret Management) |
 
 ### Nuclei template selection
 
