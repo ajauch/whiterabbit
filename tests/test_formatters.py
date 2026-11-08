@@ -13,6 +13,7 @@ from whiterabbit.report.formatters.json import format_json, write_json
 from whiterabbit.report.formatters.terminal import format_terminal
 from whiterabbit.report.models import (
     Finding,
+    FindingCategory,
     ScanReport,
     ScanResult,
     Severity,
@@ -27,7 +28,7 @@ def _report_with_findings() -> ScanReport:
             title="Missing HSTS",
             description="HSTS not set",
             remediation="Add HSTS header",
-            category="headers",
+            category=FindingCategory.HEADERS,
             scanner="headers",
         ),
         Finding(
@@ -35,7 +36,7 @@ def _report_with_findings() -> ScanReport:
             title="HTTP/2",
             description="HTTP/2 supported",
             remediation="No action",
-            category="headers",
+            category=FindingCategory.HEADERS,
             scanner="headers",
         ),
     ]

@@ -85,7 +85,7 @@ class TestParseTrivyOutput:
     def test_vulnerabilities(self) -> None:
         output = json.dumps(SAMPLE_TRIVY_OUTPUT)
         findings = _parse_trivy_output(output)
-        vuln_findings = [f for f in findings if f.category == "dependency-cve"]
+        vuln_findings = [f for f in findings if f.category == "dependency-vuln"]
         assert len(vuln_findings) == 2
         assert vuln_findings[0].severity == Severity.HIGH
         assert vuln_findings[0].cve == "CVE-2023-1234"
@@ -96,7 +96,7 @@ class TestParseTrivyOutput:
     def test_critical_vulnerability(self) -> None:
         output = json.dumps(SAMPLE_TRIVY_OUTPUT)
         findings = _parse_trivy_output(output)
-        vuln_findings = [f for f in findings if f.category == "dependency-cve"]
+        vuln_findings = [f for f in findings if f.category == "dependency-vuln"]
         flask_finding = next(f for f in vuln_findings if "flask" in f.title.lower())
         assert flask_finding.severity == Severity.CRITICAL
         assert "patched version" in flask_finding.remediation
@@ -104,7 +104,7 @@ class TestParseTrivyOutput:
     def test_misconfigurations(self) -> None:
         output = json.dumps(SAMPLE_TRIVY_OUTPUT)
         findings = _parse_trivy_output(output)
-        mc_findings = [f for f in findings if f.category == "iac-misconfig"]
+        mc_findings = [f for f in findings if f.category == "configuration"]
         assert len(mc_findings) == 1
         assert mc_findings[0].severity == Severity.HIGH
         assert "DS002" in mc_findings[0].title

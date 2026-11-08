@@ -11,7 +11,7 @@ from whiterabbit import __version__
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_runner import RepoScanRunner
 from whiterabbit.repo_scanner.base import BaseRepoScanner
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import Finding, FindingCategory, ScanResult, Severity
 
 
 class FakeRepoScanner(BaseRepoScanner):
@@ -84,7 +84,7 @@ class TestRepoScanRunner:
             title="CVE-2024-1234",
             description="Vulnerability",
             remediation="Update package",
-            category="dependency-cve",
+            category=FindingCategory.DEPENDENCY_VULN,
             scanner="fake",
         )
         scanner = FakeRepoScanner(findings=[finding])
@@ -176,7 +176,7 @@ class TestRepoScanRunner:
             title="CVE-2024-9999",
             description="Vulnerability in dep",
             remediation="Upgrade dep",
-            category="dependency-cve",
+            category=FindingCategory.DEPENDENCY_VULN,
             scanner="fake",
             raw={"matched": "dep@1.0", "file": "package.json"},
         )
@@ -188,7 +188,7 @@ class TestRepoScanRunner:
             title="Secret found",
             description="Leaked token",
             remediation="Rotate token",
-            category="secret",
+            category=FindingCategory.SECRETS,
             scanner="fake2",
         )
         s1 = FakeRepoScanner(findings=[dup, dup2])

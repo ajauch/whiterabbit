@@ -43,7 +43,7 @@ WhiteRabbit is a local web security scanner. Src layout: `src/whiterabbit/`.
 
 **Scanners:** `ssl` (SSLyze library), `headers` (httpx — also checks TRACE method, .git exposure, and CSP reporting), `nuclei` (subprocess, requires `nuclei` binary), `retirejs` (pure Python, downloads vuln DB), `testssl` (subprocess via Git Bash on Windows, requires `testssl.sh`). The testssl scanner overrides `is_available()`/`check_dependencies()` instead of using `required_binaries`.
 
-**Data models** (`report/models.py`): Pydantic v2. `Severity` enum (critical/high/medium/low/info), `Finding`, `ScanResult`, `UnavailableScanner`, `ScanReport`. `Finding` has optional `cwe`, `cve`, and `asvs` fields. `ScanReport.scanners_unavailable` records scanners that were requested but failed the `is_available()` check (binary not on PATH, etc.).
+**Data models** (`report/models.py`): Pydantic v2. `Severity` enum (critical/high/medium/low/info), `Confidence` enum (confirmed/likely/unverified), `FindingCategory` enum (crypto/headers/cookies/configuration/dependency-vuln/supply-chain/secrets/code-quality/information-leak/general), `Finding`, `ScanResult`, `UnavailableScanner`, `ScanReport`. `Finding` has: `category` (FindingCategory enum), optional `confidence` (Confidence — set by repo scanners where certainty varies), optional `file_path`/`line_number` (populated by repo scanners with source location data), and optional `cwe`, `cve`, and `asvs` fields. `ScanReport.scanners_unavailable` records scanners that were requested but failed the `is_available()` check (binary not on PATH, etc.).
 
 **Grading** (`report/grader.py`): Waterfall — any critical→F, high→D, medium→C, low→B, info-only→A, none→A+.
 

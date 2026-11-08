@@ -67,7 +67,7 @@ class TestParseSemgrepOutput:
         assert len(findings) == 1
         f = findings[0]
         assert f.severity == Severity.HIGH
-        assert f.category == "sast-owasp"
+        assert f.category == "code-quality"
         assert f.scanner == "owasp"
         assert f.cwe == "CWE-89"
         assert "sql injection" in f.title.lower()

@@ -71,7 +71,7 @@ class TestParseFinding:
         assert "Git Config Exposure" in finding.title
         assert finding.cve == "CVE-2024-1234"
         assert finding.cwe == "CWE-200"
-        assert finding.category == "exposure"
+        assert finding.category == "information-leak"
         assert finding.scanner == "nuclei"
         assert "Block access" in finding.remediation
 
@@ -107,7 +107,7 @@ class TestParseFinding:
         finding = _parse_finding(line)
         assert finding is not None
         assert finding.severity == Severity.INFO
-        assert finding.category == "tech"
+        assert finding.category == "general"
 
     def test_misconfig_category(self) -> None:
         line = json.dumps(
@@ -123,7 +123,7 @@ class TestParseFinding:
         )
         finding = _parse_finding(line)
         assert finding is not None
-        assert finding.category == "misconfig"
+        assert finding.category == "configuration"
 
     def test_secret_category(self) -> None:
         line = json.dumps(
@@ -139,7 +139,7 @@ class TestParseFinding:
         )
         finding = _parse_finding(line)
         assert finding is not None
-        assert finding.category == "secret"
+        assert finding.category == "secrets"
         assert finding.severity == Severity.HIGH
 
     def test_token_only_category(self) -> None:
@@ -156,7 +156,7 @@ class TestParseFinding:
         )
         finding = _parse_finding(line)
         assert finding is not None
-        assert finding.category == "secret"
+        assert finding.category == "secrets"
 
     def test_invalid_json(self) -> None:
         assert _parse_finding("not json") is None

@@ -13,7 +13,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from whiterabbit.config import ScanConfig
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import Finding, FindingCategory, ScanResult, Severity
 from whiterabbit.scanner.base import BaseScanner
 
 SEVERITY_MAP: dict[str, Severity] = {
@@ -168,7 +168,7 @@ def _parse_testssl_finding(entry: dict[str, Any]) -> Finding | None:
             title=vuln["title"],
             description=vuln["description"],
             remediation=vuln["remediation"],
-            category="ssl",
+            category=FindingCategory.CRYPTO,
             scanner="testssl",
             cve=vuln.get("cve"),
             cwe=vuln.get("cwe"),
@@ -185,7 +185,7 @@ def _parse_testssl_finding(entry: dict[str, Any]) -> Finding | None:
         title=finding_text[:120] if finding_text else f"testssl finding: {finding_id}",
         description=finding_text,
         remediation="Review the TLS configuration and apply recommended security settings for your server.",
-        category="ssl",
+        category=FindingCategory.CRYPTO,
         scanner="testssl",
         cve=cve,
     )

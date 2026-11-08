@@ -6,7 +6,9 @@ import json
 from datetime import UTC, datetime
 
 from whiterabbit.report.models import (
+    Confidence,
     Finding,
+    FindingCategory,
     ScanReport,
     ScanResult,
     Severity,
@@ -26,6 +28,33 @@ class TestSeverity:
         assert len(Severity) == 5
 
 
+class TestConfidence:
+    def test_values(self) -> None:
+        assert Confidence.CONFIRMED == "confirmed"
+        assert Confidence.LIKELY == "likely"
+        assert Confidence.UNVERIFIED == "unverified"
+
+    def test_all_members(self) -> None:
+        assert len(Confidence) == 3
+
+
+class TestFindingCategory:
+    def test_values(self) -> None:
+        assert FindingCategory.CRYPTO == "crypto"
+        assert FindingCategory.HEADERS == "headers"
+        assert FindingCategory.COOKIES == "cookies"
+        assert FindingCategory.CONFIGURATION == "configuration"
+        assert FindingCategory.DEPENDENCY_VULN == "dependency-vuln"
+        assert FindingCategory.SUPPLY_CHAIN == "supply-chain"
+        assert FindingCategory.SECRETS == "secrets"
+        assert FindingCategory.CODE_QUALITY == "code-quality"
+        assert FindingCategory.INFORMATION_LEAK == "information-leak"
+        assert FindingCategory.GENERAL == "general"
+
+    def test_all_members(self) -> None:
+        assert len(FindingCategory) == 10
+
+
 class TestFinding:
     def test_minimal(self) -> None:
         f = Finding(
@@ -33,10 +62,13 @@ class TestFinding:
             title="Test",
             description="A test finding",
             remediation="Fix it",
-            category="test",
+            category=FindingCategory.GENERAL,
             scanner="test_scanner",
         )
         assert f.severity == Severity.HIGH
+        assert f.confidence is None
+        assert f.file_path is None
+        assert f.line_number is None
         assert f.cwe is None
         assert f.cve is None
         assert f.references == []
@@ -48,8 +80,11 @@ class TestFinding:
             title="Expired cert",
             description="Certificate expired",
             remediation="Renew",
-            category="ssl",
+            category=FindingCategory.CRYPTO,
             scanner="ssl",
+            confidence=Confidence.CONFIRMED,
+            file_path="certs/server.pem",
+            line_number=1,
             cwe="CWE-295",
             cve="CVE-2024-0001",
             references=["https://example.com"],
@@ -57,6 +92,9 @@ class TestFinding:
         )
         assert f.cwe == "CWE-295"
         assert f.cve == "CVE-2024-0001"
+        assert f.confidence == Confidence.CONFIRMED
+        assert f.file_path == "certs/server.pem"
+        assert f.line_number == 1
         assert len(f.references) == 1
 
     def test_json_round_trip(self, sample_finding: Finding) -> None:

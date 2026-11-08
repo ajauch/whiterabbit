@@ -181,7 +181,7 @@ class TestParseTrufflehogOutput:
         assert len(findings) == 1
         f = findings[0]
         assert f.severity == Severity.MEDIUM
-        assert f.category == "secret"
+        assert f.category == "secrets"
         assert f.scanner == "secret"
         assert "AWS" in f.title
         assert "unverified" in f.title

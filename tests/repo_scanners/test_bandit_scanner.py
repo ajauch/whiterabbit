@@ -142,7 +142,7 @@ class TestParseBanditOutput:
         output = json.dumps(SAMPLE_BANDIT_OUTPUT)
         findings = _parse_bandit_output(output)
         assert all(f.scanner == "bandit" for f in findings)
-        assert all(f.category == "python-security" for f in findings)
+        assert all(f.category == "code-quality" for f in findings)
 
     def test_deduplication(self) -> None:
         data = {

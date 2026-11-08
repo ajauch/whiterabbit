@@ -396,6 +396,6 @@ class TestLogLeakScanner:
         result = asyncio.run(scanner.scan(str(tmp_path), config))
         finding = result.findings[0]
         assert finding.scanner == "logleak"
-        assert finding.category == "log-leak"
+        assert finding.category == "information-leak"
         assert finding.cwe == "CWE-532"
         assert finding.references == ["https://cwe.mitre.org/data/definitions/532.html"]

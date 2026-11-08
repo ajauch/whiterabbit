@@ -9,7 +9,7 @@ import pytest
 
 from whiterabbit import __version__
 from whiterabbit.config import ScanConfig
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import Finding, FindingCategory, ScanResult, Severity
 from whiterabbit.runner import ScanRunner
 from whiterabbit.scanner.base import BaseScanner
 
@@ -64,7 +64,7 @@ class TestScanRunner:
             title="Test finding",
             description="Desc",
             remediation="Fix",
-            category="test",
+            category=FindingCategory.GENERAL,
             scanner="fake",
         )
         scanner = FakeScanner(findings=[finding])

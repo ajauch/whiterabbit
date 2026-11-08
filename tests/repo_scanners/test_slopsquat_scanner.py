@@ -465,7 +465,7 @@ class TestMetadataToFindings:
         assert len(findings) == 1
         f = findings[0]
         assert f.severity == Severity.MEDIUM
-        assert f.category == "hallucinated-dependency"
+        assert f.category == "supply-chain"
         assert f.scanner == "slopsquat"
         assert f.cwe == "CWE-829"
         assert "fake-pkg" in f.title
@@ -489,7 +489,7 @@ class TestMetadataToFindings:
         assert len(findings) == 1
         f = findings[0]
         assert f.severity in (Severity.HIGH, Severity.CRITICAL)
-        assert f.category == "slopsquatted-dependency"
+        assert f.category == "supply-chain"
         assert f.raw["threat_score"] > 0
         assert len(f.raw["threat_signals"]) > 0
         assert "threat score" in f.title
@@ -563,9 +563,7 @@ class TestMetadataToFindings:
         findings = _metadata_to_findings(metadata, "PyPI")
         assert len(findings) == 2
 
-        categories = {f.category for f in findings}
-        assert "hallucinated-dependency" in categories
-        assert "slopsquatted-dependency" in categories
+        assert all(f.category == "supply-chain" for f in findings)
 
 
 # ---------------------------------------------------------------------------
@@ -635,7 +633,7 @@ class TestSlopsquatScanner:
         f = result.findings[0]
         assert f.severity == Severity.MEDIUM
         assert "nonexistent-ai-pkg" in f.title
-        assert f.category == "hallucinated-dependency"
+        assert f.category == "supply-chain"
 
     def test_suspicious_pypi_package(self, tmp_path: Path) -> None:
         (tmp_path / "requirements.txt").write_text("shady-pkg>=1.0\n")
@@ -673,7 +671,7 @@ class TestSlopsquatScanner:
         f = result.findings[0]
         assert f.severity in (Severity.HIGH, Severity.CRITICAL)
         assert "shady-pkg" in f.title
-        assert f.category == "slopsquatted-dependency"
+        assert f.category == "supply-chain"
         assert f.raw["threat_score"] >= THREAT_HIGH
 
     def test_nonexistent_npm_package(self, tmp_path: Path) -> None:

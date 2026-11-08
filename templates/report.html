@@ -114,6 +114,9 @@ tr.hidden { display: none; }
 .badge-low { background: var(--sev-low); }
 .badge-info { background: var(--sev-info); }
 .badge-asvs { background: var(--asvs-bg); border: 1px solid var(--asvs-border); color: var(--link); font-weight: 600; font-size: 0.72rem; }
+.badge-confidence-confirmed { background: var(--grade-a); }
+.badge-confidence-likely { background: var(--grade-c); color: #1e1e2e; }
+.badge-confidence-unverified { background: var(--sev-info); }
 
 /* Finding cards */
 .finding-card {
@@ -312,8 +315,11 @@ footer { text-align: center; margin-top: 3rem; padding-top: 1.5rem;
 
 {% for f in all_findings | sort(attribute='severity.value') %}
 <div class="finding-card" id="finding-{{ loop.index }}" data-category="{{ f.category }}">
-  <h3><span class="badge badge-{{ f.severity.value }}">{{ f.severity.value }}</span> {{ f.title }}{% if f.asvs %} <span class="badge badge-asvs">ASVS {{ f.asvs.split('-', 1)[1] if '-' in f.asvs else f.asvs }}</span>{% endif %}</h3>
+  <h3><span class="badge badge-{{ f.severity.value }}">{{ f.severity.value }}</span> {{ f.title }}{% if f.confidence %} <span class="badge badge-confidence-{{ f.confidence.value }}">{{ f.confidence.value }}</span>{% endif %}{% if f.asvs %} <span class="badge badge-asvs">ASVS {{ f.asvs.split('-', 1)[1] if '-' in f.asvs else f.asvs }}</span>{% endif %}</h3>
   <p>{{ f.description }}</p>
+  {% if f.file_path %}
+  <p class="meta-line">📄 <code>{{ f.file_path }}{% if f.line_number %}:{{ f.line_number }}{% endif %}</code></p>
+  {% endif %}
   {% if f.remediation %}
   <div class="remediation">
     <strong>Remediation</strong>

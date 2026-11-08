@@ -12,7 +12,13 @@ import httpx
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
 from whiterabbit.repo_scanner.manifest import DepInfo, detect_ecosystems_rich
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import (
+    Confidence,
+    Finding,
+    FindingCategory,
+    ScanResult,
+    Severity,
+)
 
 log = logging.getLogger("whiterabbit")
 
@@ -224,8 +230,9 @@ def _osv_to_findings(vulns: list[dict[str, object]]) -> list[Finding]:
                 remediation=f"Update {pkg_name} to a patched version."
                 if pkg_name
                 else "Update the affected dependency to a patched version.",
-                category="dependency-cve",
+                category=FindingCategory.DEPENDENCY_VULN,
                 scanner="cve",
+                confidence=Confidence.CONFIRMED,
                 cwe=cwe_id,
                 cve=cve_id,
                 references=references[:5],

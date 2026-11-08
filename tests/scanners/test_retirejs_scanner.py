@@ -536,7 +536,7 @@ class TestRetireJSScanner:
         vuln_findings = [
             f
             for f in result.findings
-            if f.category == "js-vuln" and "jquery" in f.title.lower()
+            if f.category == "dependency-vuln" and "jquery" in f.title.lower()
         ]
         assert len(vuln_findings) >= 1
 
