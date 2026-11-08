@@ -10,7 +10,13 @@ from typing import ClassVar
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import (
+    Confidence,
+    Finding,
+    FindingCategory,
+    ScanResult,
+    Severity,
+)
 from whiterabbit.resolve import resolve_binary, subprocess_env
 
 log = logging.getLogger("whiterabbit")
@@ -95,14 +101,24 @@ def _parse_bandit_output(raw: str) -> list[Finding]:
         if more_info:
             references.append(more_info)
 
+        confidence_map = {"HIGH": Confidence.CONFIRMED, "MEDIUM": Confidence.LIKELY}
+        finding_confidence = confidence_map.get(
+            confidence.upper() if confidence else "", Confidence.UNVERIFIED
+        )
+
         findings.append(
             Finding(
                 severity=severity,
                 title=title,
                 description=issue_text[:500],
                 remediation="Review and fix the identified security issue.",
-                category="python-security",
+                category=FindingCategory.CODE_QUALITY,
                 scanner="bandit",
+                confidence=finding_confidence,
+                file_path=filename,
+                line_number=int(line)
+                if isinstance(line, int | str) and str(line).isdigit()
+                else None,
                 cwe=cwe_id,
                 references=references,
                 raw={

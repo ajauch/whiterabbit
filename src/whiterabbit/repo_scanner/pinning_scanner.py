@@ -12,7 +12,7 @@ from pathlib import Path
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import Finding, FindingCategory, ScanResult, Severity
 
 log = logging.getLogger("whiterabbit")
 
@@ -214,8 +214,9 @@ def _check_missing_lockfiles(
                         "Generate a lockfile by running 'npm install', 'yarn install', "
                         "or 'pnpm install' and commit it to version control."
                     ),
-                    category="supply-chain",
+                    category=FindingCategory.SUPPLY_CHAIN,
                     scanner="pinning",
+                    file_path=rel,
                     raw={"manifest": rel},
                 )
             )
@@ -291,8 +292,9 @@ def _deps_to_findings(deps: list[DepSpec]) -> list[Finding]:
                     remediation=(
                         f"Pin all dependencies in {manifest} to exact versions."
                     ),
-                    category="unpinned-dependency",
+                    category=FindingCategory.SUPPLY_CHAIN,
                     scanner="pinning",
+                    file_path=manifest,
                     raw={
                         "packages": [d.name for d in unpinned],
                         "manifest": manifest,
@@ -314,8 +316,10 @@ def _deps_to_findings(deps: list[DepSpec]) -> list[Finding]:
                             f"ones — can be installed."
                         ),
                         remediation=_remediation_for(dep),
-                        category="unpinned-dependency",
+                        category=FindingCategory.SUPPLY_CHAIN,
                         scanner="pinning",
+                        file_path=dep.manifest,
+                        line_number=dep.line_number,
                         raw={
                             "package": dep.name,
                             "specifier": dep.specifier,
@@ -339,8 +343,10 @@ def _deps_to_findings(deps: list[DepSpec]) -> list[Finding]:
                         f"that may introduce vulnerabilities."
                     )[:500],
                     remediation=_remediation_for(dep),
-                    category="unpinned-dependency",
+                    category=FindingCategory.SUPPLY_CHAIN,
                     scanner="pinning",
+                    file_path=dep.manifest,
+                    line_number=dep.line_number,
                     raw={
                         "package": dep.name,
                         "specifier": dep.specifier,

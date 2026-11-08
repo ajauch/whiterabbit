@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- **Finding model enhancements** — three new fields on the `Finding` data model:
+  - `confidence` (`Confidence` enum: confirmed/likely/unverified) — set by repo
+    scanners where certainty varies (e.g., TruffleHog verified vs unverified
+    secrets, bandit confidence levels, slopsquat confirmed vs suspicious).
+  - `file_path` and `line_number` — populated by repo scanners that have source
+    location data (secret, logleak, bandit, owasp, pinning scanners).
+  - `category` is now a `FindingCategory` enum with 10 standardized values
+    (crypto, headers, cookies, configuration, dependency-vuln, supply-chain,
+    secrets, code-quality, information-leak, general) instead of free-form
+    strings per scanner.
+- HTML reports now display confidence badges and file location metadata on
+  finding cards.
+
 ### Added
 
 - Repository scanning via `whiterabbit scanrepo` — scan GitHub repos or local

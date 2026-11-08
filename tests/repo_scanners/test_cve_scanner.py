@@ -234,7 +234,7 @@ class TestOsvToFindings:
         assert len(findings) == 1
         f = findings[0]
         assert f.cve == "CVE-2024-1234"
-        assert f.category == "dependency-cve"
+        assert f.category == "dependency-vuln"
         assert f.scanner == "cve"
         assert "vulnerable-pkg" in f.title
         assert f.cwe == "CWE-89"

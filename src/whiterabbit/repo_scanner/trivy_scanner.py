@@ -10,7 +10,13 @@ from typing import Any, ClassVar
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import (
+    Confidence,
+    Finding,
+    FindingCategory,
+    ScanResult,
+    Severity,
+)
 from whiterabbit.resolve import resolve_binary, subprocess_env
 
 log = logging.getLogger("whiterabbit")
@@ -71,8 +77,9 @@ def _parse_vulnerability(vuln: dict[str, Any], target: str) -> Finding:
         title=title,
         description=description[:500],
         remediation=remediation,
-        category="dependency-cve",
+        category=FindingCategory.DEPENDENCY_VULN,
         scanner="trivy",
+        confidence=Confidence.CONFIRMED,
         cwe=cwe,
         cve=vuln_id if vuln_id.startswith("CVE-") else None,
         references=references,
@@ -101,8 +108,9 @@ def _parse_misconfig(mc: dict[str, Any], target: str) -> Finding:
         title=f"{title} — {target}",
         description=description[:500],
         remediation=remediation or "Review and fix the identified misconfiguration.",
-        category="iac-misconfig",
+        category=FindingCategory.CONFIGURATION,
         scanner="trivy",
+        confidence=Confidence.LIKELY,
         references=references,
         raw={"target": target, "id": mc_id},
     )

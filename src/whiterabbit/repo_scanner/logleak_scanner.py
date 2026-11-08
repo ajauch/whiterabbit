@@ -11,7 +11,13 @@ from pathlib import Path
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import (
+    Confidence,
+    Finding,
+    FindingCategory,
+    ScanResult,
+    Severity,
+)
 
 log = logging.getLogger("whiterabbit")
 
@@ -241,8 +247,11 @@ def _scan_file(path: Path, repo_root: str) -> list[Finding]:
                         "instead of the entire body. Use structured logging with "
                         "explicit field selection."
                     ),
-                    category="log-leak",
+                    category=FindingCategory.INFORMATION_LEAK,
                     scanner="logleak",
+                    confidence=Confidence.LIKELY,
+                    file_path=rel,
+                    line_number=line_num,
                     cwe="CWE-532",
                     asvs="v5.0.0-16.2.5",
                     references=["https://cwe.mitre.org/data/definitions/532.html"],
@@ -280,8 +289,11 @@ def _scan_file(path: Path, repo_root: str) -> list[Finding]:
                         "or redact/mask it before logging. Never log passwords, "
                         "secrets, tokens, or PII in plaintext."
                     ),
-                    category="log-leak",
+                    category=FindingCategory.INFORMATION_LEAK,
                     scanner="logleak",
+                    confidence=Confidence.LIKELY,
+                    file_path=rel,
+                    line_number=line_num,
                     cwe="CWE-532",
                     asvs="v5.0.0-16.2.5",
                     references=["https://cwe.mitre.org/data/definitions/532.html"],

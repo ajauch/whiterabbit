@@ -13,7 +13,13 @@ import httpx
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
 from whiterabbit.repo_scanner.manifest import extract_package_names
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import (
+    Confidence,
+    Finding,
+    FindingCategory,
+    ScanResult,
+    Severity,
+)
 
 log = logging.getLogger("whiterabbit")
 
@@ -372,8 +378,9 @@ def _metadata_to_findings(
                         f"or replace it with a verified, real package that "
                         f"provides the needed functionality."
                     ),
-                    category="hallucinated-dependency",
+                    category=FindingCategory.SUPPLY_CHAIN,
                     scanner="slopsquat",
+                    confidence=Confidence.CONFIRMED,
                     cwe="CWE-829",
                     raw={
                         "package": meta.name,
@@ -414,8 +421,9 @@ def _metadata_to_findings(
                     f"alternatives. If it cannot be verified, remove it "
                     f"and use a known-good package."
                 ),
-                category="slopsquatted-dependency",
+                category=FindingCategory.SUPPLY_CHAIN,
                 scanner="slopsquat",
+                confidence=Confidence.LIKELY,
                 cwe="CWE-829",
                 raw={
                     "package": meta.name,

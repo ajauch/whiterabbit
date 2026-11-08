@@ -25,13 +25,35 @@ SEVERITY_ORDER: dict[Severity, int] = {
 }
 
 
+class Confidence(StrEnum):
+    CONFIRMED = "confirmed"
+    LIKELY = "likely"
+    UNVERIFIED = "unverified"
+
+
+class FindingCategory(StrEnum):
+    CRYPTO = "crypto"
+    HEADERS = "headers"
+    COOKIES = "cookies"
+    CONFIGURATION = "configuration"
+    DEPENDENCY_VULN = "dependency-vuln"
+    SUPPLY_CHAIN = "supply-chain"
+    SECRETS = "secrets"
+    CODE_QUALITY = "code-quality"
+    INFORMATION_LEAK = "information-leak"
+    GENERAL = "general"
+
+
 class Finding(BaseModel):
     severity: Severity
     title: str
     description: str
     remediation: str
-    category: str
+    category: FindingCategory
     scanner: str
+    confidence: Confidence | None = None
+    file_path: str | None = None
+    line_number: int | None = None
     cwe: str | None = None
     cve: str | None = None
     asvs: str | None = None

@@ -29,7 +29,7 @@ from sslyze import (  # type: ignore[attr-defined]
 )
 
 from whiterabbit.config import ScanConfig
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import Finding, FindingCategory, ScanResult, Severity
 from whiterabbit.scanner.base import BaseScanner
 
 WEAK_CIPHERS = {"RC4", "DES", "3DES", "NULL", "EXPORT", "anon"}
@@ -131,7 +131,7 @@ class SSLScanner(BaseScanner):
                         title=f"Certificate expired on {leaf.not_valid_after_utc.date()}",
                         description="The SSL certificate has expired and browsers will show security warnings.",
                         remediation="Renew the SSL certificate immediately.",
-                        category="ssl",
+                        category=FindingCategory.CRYPTO,
                         scanner=self.name,
                         cwe="CWE-298",
                         asvs="v5.0.0-12.2.2",
@@ -146,7 +146,7 @@ class SSLScanner(BaseScanner):
                         title=f"Certificate expires in {days_left} days",
                         description=f"The certificate expires on {leaf.not_valid_after_utc.date()}, which is less than 30 days away.",
                         remediation="Renew the certificate before it expires. Consider setting up auto-renewal with Let's Encrypt.",
-                        category="ssl",
+                        category=FindingCategory.CRYPTO,
                         scanner=self.name,
                         asvs="v5.0.0-12.2.2",
                     )
@@ -159,7 +159,7 @@ class SSLScanner(BaseScanner):
                         title="Certificate is self-signed",
                         description="The certificate is self-signed and will not be trusted by browsers.",
                         remediation="Obtain a certificate from a trusted Certificate Authority. Let's Encrypt provides free certificates.",
-                        category="ssl",
+                        category=FindingCategory.CRYPTO,
                         scanner=self.name,
                         cwe="CWE-295",
                         asvs="v5.0.0-12.2.2",
@@ -192,7 +192,7 @@ class SSLScanner(BaseScanner):
                         title="Certificate hostname mismatch",
                         description=f"Certificate is issued for {', '.join(san_names)} but scanning {hostname}.",
                         remediation="Obtain a certificate that includes the correct hostname in its Subject Alternative Names.",
-                        category="ssl",
+                        category=FindingCategory.CRYPTO,
                         scanner=self.name,
                         cwe="CWE-295",
                         asvs="v5.0.0-12.3.2",
@@ -209,7 +209,7 @@ class SSLScanner(BaseScanner):
                         title=f"RSA key is {key.key_size} bits (minimum 2048)",
                         description=f"The RSA key is only {key.key_size} bits, which is considered weak.",
                         remediation="Generate a new certificate with at least a 2048-bit RSA key, or use ECDSA.",
-                        category="ssl",
+                        category=FindingCategory.CRYPTO,
                         scanner=self.name,
                         cwe="CWE-326",
                     )
@@ -230,7 +230,7 @@ class SSLScanner(BaseScanner):
                         title="Incomplete certificate chain",
                         description="The server's certificate chain could not be validated against any trust store.",
                         remediation="Ensure the server sends the full certificate chain including intermediate certificates.",
-                        category="ssl",
+                        category=FindingCategory.CRYPTO,
                         scanner=self.name,
                         cwe="CWE-295",
                         asvs="v5.0.0-12.3.2",
@@ -250,7 +250,7 @@ class SSLScanner(BaseScanner):
                         title="OCSP stapling not enabled",
                         description="The server does not staple OCSP responses, which can slow certificate validation.",
                         remediation="Enable OCSP stapling in your server configuration. For Nginx: `ssl_stapling on; ssl_stapling_verify on;`",
-                        category="ssl",
+                        category=FindingCategory.CRYPTO,
                         scanner=self.name,
                         asvs="v5.0.0-12.1.4",
                     )
@@ -314,7 +314,7 @@ class SSLScanner(BaseScanner):
                         title=title,
                         description=f"{protocol} is enabled with {len(cipher_result.accepted_cipher_suites)} accepted cipher suite(s). This protocol has known vulnerabilities.",
                         remediation=remediation,
-                        category="ssl",
+                        category=FindingCategory.CRYPTO,
                         scanner=self.name,
                         cwe=cwe,
                         cve=cve,
@@ -335,7 +335,7 @@ class SSLScanner(BaseScanner):
                         title="TLS 1.3 not supported",
                         description="The server does not support TLS 1.3, the latest and most secure TLS version.",
                         remediation="Enable TLS 1.3 in your server configuration. For Nginx: `ssl_protocols TLSv1.2 TLSv1.3;`",
-                        category="ssl",
+                        category=FindingCategory.CRYPTO,
                         scanner=self.name,
                         asvs="v5.0.0-12.1.1",
                     )
@@ -368,7 +368,7 @@ class SSLScanner(BaseScanner):
                             title=f"Weak cipher suite: {cipher_name}",
                             description=f"The server accepts the weak cipher suite {cipher_name}.",
                             remediation="Disable weak cipher suites in your server configuration. Only allow modern ciphers with AEAD.",
-                            category="ssl",
+                            category=FindingCategory.CRYPTO,
                             scanner=self.name,
                             cwe="CWE-326",
                             asvs="v5.0.0-12.1.2",
@@ -389,7 +389,7 @@ class SSLScanner(BaseScanner):
                     title="Server is vulnerable to Heartbleed (CVE-2014-0160)",
                     description="The server is vulnerable to the Heartbleed bug, which allows attackers to read server memory.",
                     remediation="Update OpenSSL to a patched version immediately and reissue all certificates.",
-                    category="ssl",
+                    category=FindingCategory.CRYPTO,
                     scanner=self.name,
                     cwe="CWE-119",
                     cve="CVE-2014-0160",
@@ -413,7 +413,7 @@ class SSLScanner(BaseScanner):
                     title="Server is vulnerable to ROBOT attack",
                     description="The server is vulnerable to the Return Of Bleichenbacher's Oracle Threat (ROBOT) attack.",
                     remediation="Disable RSA key exchange cipher suites or update your TLS library.",
-                    category="ssl",
+                    category=FindingCategory.CRYPTO,
                     scanner=self.name,
                     cwe="CWE-203",
                     references=["https://robotattack.org/"],
@@ -432,7 +432,7 @@ class SSLScanner(BaseScanner):
                     title="TLS compression enabled — vulnerable to CRIME attack",
                     description="TLS compression is enabled, which makes the server vulnerable to the CRIME attack.",
                     remediation="Disable TLS compression in your server configuration.",
-                    category="ssl",
+                    category=FindingCategory.CRYPTO,
                     scanner=self.name,
                     cwe="CWE-310",
                     cve="CVE-2012-4929",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from whiterabbit.report.grader import compute_grade
-from whiterabbit.report.models import Finding, Severity
+from whiterabbit.report.models import Finding, FindingCategory, Severity
 
 
 def _make_finding(severity: Severity) -> Finding:
@@ -12,7 +12,7 @@ def _make_finding(severity: Severity) -> Finding:
         title=f"Test {severity.value}",
         description="Test",
         remediation="Fix",
-        category="test",
+        category=FindingCategory.GENERAL,
         scanner="test",
     )
 

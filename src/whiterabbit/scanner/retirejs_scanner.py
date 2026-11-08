@@ -14,7 +14,7 @@ from urllib.parse import urljoin
 import httpx
 
 from whiterabbit.config import ScanConfig
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import Finding, FindingCategory, ScanResult, Severity
 from whiterabbit.scanner.base import BaseScanner
 
 RETIREJS_DB_URL = "https://raw.githubusercontent.com/RetireJS/retire.js/master/repository/jsrepository.json"
@@ -218,7 +218,7 @@ def _check_vulnerabilities(
                 remediation=f"Upgrade {library} to the latest version (requires at least {below})."
                 if below
                 else f"Upgrade {library} to the latest version.",
-                category="js-vuln",
+                category=FindingCategory.DEPENDENCY_VULN,
                 scanner="retirejs",
                 cve=cve,
                 references=info if isinstance(info, list) else [info],
@@ -316,7 +316,7 @@ class RetireJSScanner(BaseScanner):
                                 title=f"Vulnerability database is {int(age_days)} days old",
                                 description="The retire.js vulnerability database may be outdated. Re-run the scan to refresh.",
                                 remediation="Delete the cache at ~/.whiterabbit/cache/jsrepository.json to force a refresh.",
-                                category="js-vuln",
+                                category=FindingCategory.DEPENDENCY_VULN,
                                 scanner="retirejs",
                             )
                         )

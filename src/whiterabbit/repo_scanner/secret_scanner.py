@@ -13,7 +13,13 @@ from urllib.parse import urlparse
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import (
+    Confidence,
+    Finding,
+    FindingCategory,
+    ScanResult,
+    Severity,
+)
 from whiterabbit.resolve import resolve_binary, subprocess_env
 
 log = logging.getLogger("whiterabbit")
@@ -232,8 +238,13 @@ def _parse_trufflehog_output(raw: str) -> list[Finding]:
                 title=title,
                 description=description,
                 remediation=f"Revoke the {detector} credential immediately and rotate it. Remove the secret from source code and use environment variables or a secrets manager instead.",
-                category="secret",
+                category=FindingCategory.SECRETS,
                 scanner="secret",
+                confidence=Confidence.CONFIRMED if verified else Confidence.UNVERIFIED,
+                file_path=filepath,
+                line_number=int(line_num)
+                if line_num and str(line_num).isdigit()
+                else None,
                 asvs="v5.0.0-13.3.1",
                 raw={
                     "detector": detector,

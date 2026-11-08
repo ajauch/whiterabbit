@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from typing import ClassVar
 
 from whiterabbit.config import ScanConfig
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import Finding, FindingCategory, ScanResult, Severity
 from whiterabbit.resolve import resolve_binary, subprocess_env
 from whiterabbit.scanner.base import BaseScanner
 
@@ -103,15 +103,15 @@ def _parse_finding(line: str) -> Finding | None:
         "Review the matched endpoint and apply appropriate security controls.",
     )
 
-    category = "nuclei"
+    category = FindingCategory.GENERAL
     if any(t in tags for t in ("token", "secret")):
-        category = "secret"
+        category = FindingCategory.SECRETS
     elif any(t in tags for t in ("exposure", "exposed")):
-        category = "exposure"
+        category = FindingCategory.INFORMATION_LEAK
     elif "misconfig" in tags:
-        category = "misconfig"
+        category = FindingCategory.CONFIGURATION
     elif "tech" in tags:
-        category = "tech"
+        category = FindingCategory.GENERAL
 
     return Finding(
         severity=severity,

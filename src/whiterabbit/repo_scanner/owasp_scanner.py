@@ -11,7 +11,13 @@ from typing import ClassVar
 
 from whiterabbit.config import RepoScanConfig
 from whiterabbit.repo_scanner.base import BaseRepoScanner
-from whiterabbit.report.models import Finding, ScanResult, Severity
+from whiterabbit.report.models import (
+    Confidence,
+    Finding,
+    FindingCategory,
+    ScanResult,
+    Severity,
+)
 from whiterabbit.resolve import resolve_binary, subprocess_env
 
 log = logging.getLogger("whiterabbit")
@@ -183,8 +189,13 @@ def _parse_semgrep_output(raw: str) -> list[Finding]:
                 title=f"{rule_name}{owasp_tag} — {location}",
                 description=message[:500],
                 remediation=remediation,
-                category="sast-owasp",
+                category=FindingCategory.CODE_QUALITY,
                 scanner="owasp",
+                confidence=Confidence.LIKELY,
+                file_path=path,
+                line_number=int(line)
+                if isinstance(line, int | str) and str(line).isdigit()
+                else None,
                 cwe=cwe_id,
                 references=references,
                 raw={"check_id": check_id, "path": path, "line": line},

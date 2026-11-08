@@ -7,7 +7,13 @@ from datetime import UTC, datetime
 import pytest
 
 from whiterabbit.config import RepoScanConfig, ScanConfig
-from whiterabbit.report.models import Finding, ScanReport, ScanResult, Severity
+from whiterabbit.report.models import (
+    Finding,
+    FindingCategory,
+    ScanReport,
+    ScanResult,
+    Severity,
+)
 
 
 @pytest.fixture
@@ -27,7 +33,7 @@ def sample_finding() -> Finding:
         title="Missing HSTS header",
         description="The Strict-Transport-Security header is not set.",
         remediation="Add the HSTS header to your server configuration.",
-        category="headers",
+        category=FindingCategory.HEADERS,
         scanner="headers",
         cwe="CWE-523",
     )
@@ -41,7 +47,7 @@ def sample_findings() -> list[Finding]:
             title="Expired certificate",
             description="The SSL certificate has expired.",
             remediation="Renew the certificate.",
-            category="ssl",
+            category=FindingCategory.CRYPTO,
             scanner="ssl",
         ),
         Finding(
@@ -49,7 +55,7 @@ def sample_findings() -> list[Finding]:
             title="Missing HSTS",
             description="HSTS header not set.",
             remediation="Add HSTS header.",
-            category="headers",
+            category=FindingCategory.HEADERS,
             scanner="headers",
         ),
         Finding(
@@ -57,7 +63,7 @@ def sample_findings() -> list[Finding]:
             title="TLS 1.3 not supported",
             description="Server does not support TLS 1.3.",
             remediation="Enable TLS 1.3.",
-            category="ssl",
+            category=FindingCategory.CRYPTO,
             scanner="ssl",
         ),
         Finding(
@@ -65,7 +71,7 @@ def sample_findings() -> list[Finding]:
             title="Server header exposed",
             description="Server header reveals version info.",
             remediation="Remove or obscure the Server header.",
-            category="headers",
+            category=FindingCategory.HEADERS,
             scanner="headers",
         ),
         Finding(
@@ -73,7 +79,7 @@ def sample_findings() -> list[Finding]:
             title="HTTP/2 supported",
             description="Server supports HTTP/2.",
             remediation="No action needed.",
-            category="headers",
+            category=FindingCategory.HEADERS,
             scanner="headers",
         ),
     ]

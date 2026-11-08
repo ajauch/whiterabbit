@@ -349,7 +349,7 @@ class TestDepsToFindings:
         deps = [DepSpec("requests", "", "requirements.txt", 1)]
         findings = _deps_to_findings(deps)
         assert findings[0].scanner == "pinning"
-        assert findings[0].category == "unpinned-dependency"
+        assert findings[0].category == "supply-chain"
 
     def test_raw_metadata(self) -> None:
         deps = [DepSpec("flask", ">=3.0", "requirements.txt", 5)]
